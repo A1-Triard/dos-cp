@@ -1,0 +1,47 @@
+#!/bin/sh
+set -eu
+
+cd "$(dirname -- "$(realpath -- "$0")")"
+
+echo__() {
+    printf "%s\n" "$1"
+}
+
+echo_n__() {
+    printf "%s" "$1"
+}
+
+chr() {
+    # shellcheck disable=SC2059,SC2046,SC2086
+    printf \\$(printf '%03o' $1)
+}
+
+if [ $# -ne 1 ]; then
+    echo "Usage: $0 <encoding>"
+    exit 1
+fi
+
+rm -f "$1".bytes
+
+range="$(seq 128 255)"
+for i in $range; do
+    c="$(chr "$i")"
+    echo_n__ "$c" >> "$1".bytes || exit 1
+done
+
+while true; do
+    err="$(LC_ALL=C iconv -f "$1" -t UTF-8 "$1".bytes 2>&1 >/dev/null || true)"
+    if [ -z "$err" ]; then
+        break
+    fi
+    invalid_char_offset="$(echo__ "$err" | tr -dc '0-9')"
+    dd if="$1".bytes of="$1" bs=1 count="$invalid_char_offset" || { rm -f "$1".bytes; exit 1; }
+    echo_n__ "?" >> "$1"
+    skip="$((invalid_char_offset + 1))"
+    dd if="$1".bytes of="$1" bs=1 skip="$skip" seek="$skip" || { rm -f "$1".bytes; exit 1; }
+    mv -f "$1" "$1".bytes
+done
+
+# shellcheck disable=SC2094
+iconv -f "$1" -t UTF-8 "$1".bytes > "$1" || { rm -f "$1".bytes; exit 1; }
+rm -f "$1".bytes
