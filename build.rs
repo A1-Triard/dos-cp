@@ -14,7 +14,9 @@ fn main() {
     let out_dir = Path::new(&out_dir);
     let rs = out_dir.join("generated.rs");
     let mut rs = File::create(rs).unwrap();
-    for cp in ["CP437", "CP857", "CP866"] {
+    for cp in [
+        "CP437", "CP857", "CP866", "CP737", "CP850", "CP852",
+    ] {
         let mod_name = cp.to_ascii_lowercase();
         println!("cargo:rerun-if-changed={}", cp);
         rs.write(b"\n").unwrap();
