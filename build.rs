@@ -15,7 +15,11 @@ fn main() {
     let rs = out_dir.join("generated.rs");
     let mut rs = File::create(rs).unwrap();
     for cp in [
-        "CP437", "CP857", "CP866", "CP737", "CP850", "CP852",
+        "CP437", "CP737",
+        "CP850", "CP852",
+        "CP855",
+        "CP857",
+        "CP860", "CP861", "CP862", "CP863", "CP864", "CP865", "CP866",
     ] {
         let mod_name = cp.to_ascii_lowercase();
         println!("cargo:rerun-if-changed={}", cp);
