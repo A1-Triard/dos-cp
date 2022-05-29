@@ -3,6 +3,7 @@ name = "dos-cp"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
+[build-dependencies]
+arrayvec = "0.7.2"
+itertools = "0.10.3"
+utf8-chars = "2.0.1"
