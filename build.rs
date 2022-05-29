@@ -20,6 +20,10 @@ fn main() {
         "CP855",
         "CP857",
         "CP860", "CP861", "CP862", "CP863", "CP864", "CP865", "CP866",
+        "CP869",
+        "CP874",
+        "CP912",
+        "CP915",
     ] {
         let mod_name = cp.to_ascii_lowercase();
         println!("cargo:rerun-if-changed={}", cp);
