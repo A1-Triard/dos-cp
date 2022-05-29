@@ -1,7 +1,21 @@
 [package]
-name = "dos-cp"
-version = "0.1.0"
 edition = "2021"
+name = "dos-cp"
+version = "0.0.1"
+rust-version = "1.61"
+authors = ["warlock <internalmike@gmail.com>"]
+description = "DOS code pages."
+readme = "README.md"
+documentation = "https://docs.rs/dos-cp/"
+keywords = ["codepage", "dos", "oem", "unicode", "encoding"]
+categories = ["encoding", "no-std"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/A1-Triard/dos-cp"
+
+[workspace]
+exclude = [
+    "ensure_no_std",
+]
 
 [build-dependencies]
 arrayvec = "0.7.2"
