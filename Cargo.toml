@@ -5,5 +5,4 @@ edition = "2021"
 
 [build-dependencies]
 arrayvec = "0.7.2"
-itertools = "0.10.3"
 utf8-chars = "2.0.1"
