@@ -2,28 +2,28 @@
 
 #![no_std]
 
-use core::num::NonZeroU8;
+use core::num::{NonZeroU8, NonZeroU32};
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct CP {
-    to_uni: unsafe fn(u8) -> u32,
+    to_uni: unsafe fn(u8) -> Option<NonZeroU32>,
     from_uni: unsafe fn(u32) -> Option<NonZeroU8>,
 }
 
 impl CP {
-    pub fn to_char(&self, c: u8) -> char {
+    pub fn to_char(&self, c: u8) -> Option<char> {
         if c < 128 {
-            c as char
+            Some(c as char)
         } else {
-            unsafe { char::from_u32_unchecked((self.to_uni)(c & 0x7F)) }
+            unsafe { ((self.to_uni)(c & 0x7F)).map(|x| char::from_u32_unchecked(x.get())) }
         }
     }
 
-    pub fn from_char(&self, c: char) -> u8 {
+    pub fn from_char(&self, c: char) -> Option<u8> {
         if (c as u32) < 128 {
-            c as u32 as u8
+            Some(c as u32 as u8)
         } else {
-            unsafe { (self.from_uni)(c as u32) }.map_or(0, |x| x.get())
+            unsafe { (self.from_uni)(c as u32) }.map(|x| x.get())
         }
     }
 }

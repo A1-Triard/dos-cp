@@ -35,9 +35,9 @@ fn main() {
         rs.write(b"\n").unwrap();
         rs.write(format!("mod {} {{\n", mod_name).as_bytes()).unwrap();
         rs.write(b"    use core::hint::unreachable_unchecked;\n").unwrap();
-        rs.write(b"    use core::num::NonZeroU8;\n").unwrap();
+        rs.write(b"    use core::num::{NonZeroU8, NonZeroU32};\n").unwrap();
         rs.write(b"\n").unwrap();
-        rs.write(b"    pub unsafe fn to_uni(c: u8) -> u32 {\n").unwrap();
+        rs.write(b"    pub unsafe fn to_uni(c: u8) -> Option<NonZeroU32> {\n").unwrap();
         rs.write(b"        match c {\n").unwrap();
         let table = File::open(cp).expect("codepage table not found");
         let mut chars = BufReader::new(table)
@@ -48,8 +48,12 @@ fn main() {
             .collect::<Arr<_>>()
         ;
         assert_eq!(chars.len(), 128, "invalid codepage table");
-        for (u, a) in chars.iter().copied().filter(|&(u, _)| u != '?' as u32) {
-            rs.write(format!("            {} => {},\n", a - 128, u).as_bytes()).unwrap();
+        for (u, a) in chars.iter().copied() {
+            if u == '?' as u32 {
+                rs.write(format!("            {} => None,\n", a - 128).as_bytes()).unwrap();
+            } else {
+                rs.write(format!("            {} => Some(NonZeroU32::new_unchecked({})),\n", a - 128, u).as_bytes()).unwrap();
+            }
         }
         rs.write(b"            _ => unreachable_unchecked()\n").unwrap();
         rs.write(b"        }\n").unwrap();
