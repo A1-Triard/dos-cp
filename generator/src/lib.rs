@@ -1,3 +1,5 @@
+#![deny(warnings)]
+
 use dos_cp::{CodePage, hash};
 use std::mem::{MaybeUninit, transmute};
 

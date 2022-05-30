@@ -31,10 +31,12 @@ pub extern fn panic(_info: &PanicInfo) -> ! {
     unsafe { exit(99) }
 }
 
-use dos_cp::CP437;
+use dos_cp::CodePage;
+
+include!(concat!(env!("OUT_DIR"), "/cp852.rs"));
 
 #[start]
 pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
-    assert_eq!(CP437.to_char(0xF8), Some('\u{00B0}'));
+    assert_eq!(CP852.to_char(0xF8), Some('\u{00B0}'));
     0
 }
