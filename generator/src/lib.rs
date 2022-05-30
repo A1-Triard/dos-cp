@@ -1,3 +1,4 @@
+use dos_cp::{CodePage, hash};
 use std::mem::{MaybeUninit, transmute};
 
 pub const KNOWN_CODE_PAGES: [u16; 18] = [
@@ -9,93 +10,87 @@ pub const KNOWN_CODE_PAGES: [u16; 18] = [
 #[derive(Copy, Clone)]
 enum Filled { None, Half, Full }
 
-pub fn generate_code_page(code_page: u16) -> [u8; 528] {
-    let (base_table, mask) = base_table_and_mask(code_page);
-    let mut res: [MaybeUninit<u8>; 528] = unsafe { MaybeUninit::uninit().assume_init() };
-    res[0].write(b'C');
-    res[1].write(b'O');
-    res[2].write(b'D');
-    res[3].write(b'P');
-    res[4].write(b'G');
-    res[5].write(1);
-    res[6].write(code_page as u8);
-    res[7].write((code_page >> 8) as u8);
-    for i in 0 .. 8 {
-        res[8 + i].write((mask >> (8 * i)) as u8);
-    }
-    let base_table = base_table.iter().copied().map(|c| {
-        if c == '?' { return 0; }
-        let c: u16 = (c as u32).try_into()
-            .expect("too big char, bit needs to be preremapped");
-        c
-    });
-    let mut first_part = &mut res[16 .. 16 + 256];
-    for byte in base_table.clone().flat_map(|w| [(w >> 8) as u8, w as u8]) {
-        first_part[0].write(byte);
-        first_part = &mut first_part[1 ..];
-    }
-    let second_part = &mut res[16 + 256 .. 16 + 512];
-    let mut filled = [Filled::None; 128];
-    for (i, w) in base_table.into_iter().enumerate().filter(|&(_, w)| w != 0) {
-        let hash = hash(w, mask);
-        let filled = &mut filled[hash as usize];
-        match filled {
-            Filled::None => {
-                second_part[(2 * hash) as usize].write(i as u8);
-                *filled = Filled::Half;
-            },
-            Filled::Half => {
-                second_part[(2 * hash + 1) as usize].write(i as u8);
-                *filled = Filled::Full;
-            },
-            Filled::Full => panic!("invalid base table/mask"),
-        }
-    }
-    for (i, filled) in filled.into_iter().enumerate() {
-        match filled {
-            Filled::None => {
-                second_part[2 * i].write(128);
-                second_part[2 * i + 1].write(128);
-            },
-            Filled::Half => {
-                second_part[2 * i + 1].write(128);
-            },
-            Filled::Full => { }
-        }
-    }
-    unsafe { transmute(res) }
+pub trait CodePageGenExt {
+    fn generate(code_page: u16) -> Self;
 }
 
-fn hash(mut w: u16, mut mask: u64) -> u8 {
-    let mut res = 0;
-    for _ in 0 .. 8 {
-        res |= (w as u8) & (mask as u8);
-        w >>= 1;
-        mask >>= 8;
+impl CodePageGenExt for CodePage {
+    fn generate(code_page: u16) -> CodePage {
+        let (base_table, mask) = base_table_and_mask(code_page);
+        let mut res: [MaybeUninit<u8>; 528] = unsafe { MaybeUninit::uninit().assume_init() };
+        res[0].write(b'C');
+        res[1].write(b'O');
+        res[2].write(b'D');
+        res[3].write(b'P');
+        res[4].write(b'G');
+        res[5].write(1);
+        res[6].write(code_page as u8);
+        res[7].write((code_page >> 8) as u8);
+        res[8 .. 16].copy_from_slice(unsafe { transmute(&mask[..]) });
+        let base_table = base_table.iter().copied().map(|c| {
+            if c == '?' { return 0; }
+            let c: u16 = (c as u32).try_into()
+                .expect("too big char, bit needs to be preremapped");
+            c
+        });
+        let mut first_part = &mut res[16 .. 16 + 256];
+        for byte in base_table.clone().flat_map(|w| [(w >> 8) as u8, w as u8]) {
+            first_part[0].write(byte);
+            first_part = &mut first_part[1 ..];
+        }
+        let second_part = &mut res[16 + 256 .. 16 + 512];
+        let mut filled = [Filled::None; 128];
+        for (i, w) in base_table.into_iter().enumerate().filter(|&(_, w)| w != 0) {
+            let hash = hash(w, &mask);
+            let filled = &mut filled[hash as usize];
+            match filled {
+                Filled::None => {
+                    second_part[(2 * hash) as usize].write(i as u8);
+                    *filled = Filled::Half;
+                },
+                Filled::Half => {
+                    second_part[(2 * hash + 1) as usize].write(i as u8);
+                    *filled = Filled::Full;
+                },
+                Filled::Full => panic!("invalid base table/mask"),
+            }
+        }
+        for (i, filled) in filled.into_iter().enumerate() {
+            match filled {
+                Filled::None => {
+                    second_part[2 * i].write(128);
+                    second_part[2 * i + 1].write(128);
+                },
+                Filled::Half => {
+                    second_part[2 * i + 1].write(128);
+                },
+                Filled::Full => { }
+            }
+        }
+        unsafe { CodePage::new_unchecked(transmute(res)) }
     }
-    res
 }
 
-fn base_table_and_mask(code_page: u16) -> (&'static [char; 128], u64) {
+fn base_table_and_mask(code_page: u16) -> (&'static [char; 128], [u8; 8]) {
     match code_page {
-        437 => (&CP437, 0x000000000000007F),
-        737 => (&CP737, 0x000000000000007F),
-        850 => (&CP850, 0x000000000000007F),
-        852 => (&CP852, 0x000000000000007F),
-        855 => (&CP855, 0x000000000000007F),
-        857 => (&CP857, 0x000000000000007F),
-        858 => (&CP858, 0x000000000000007F),
-        860 => (&CP860, 0x000000000000007F),
-        861 => (&CP861, 0x000000000000007F),
-        862 => (&CP862, 0x000000000000403F),
-        863 => (&CP863, 0x000000000000007F),
-        864 => (&CP864, 0x000000000000007F),
-        865 => (&CP865, 0x000000000000007F),
-        866 => (&CP866, 0x000000000000007F),
-        869 => (&CP869, 0x000000000000007F),
-        874 => (&CP874, 0x000000000000007F),
-        912 => (&CP912, 0x000000000000007F),
-        915 => (&CP915, 0x000000000000007F),
+        437 => (&CP437, [0x7F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
+        737 => (&CP737, [0x7F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
+        850 => (&CP850, [0x7F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
+        852 => (&CP852, [0x7F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
+        855 => (&CP855, [0x7F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
+        857 => (&CP857, [0x7F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
+        858 => (&CP858, [0x7F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
+        860 => (&CP860, [0x7F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
+        861 => (&CP861, [0x7F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
+        862 => (&CP862, [0x3F, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
+        863 => (&CP863, [0x7F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
+        864 => (&CP864, [0x7F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
+        865 => (&CP865, [0x7F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
+        866 => (&CP866, [0x7F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
+        869 => (&CP869, [0x7F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
+        874 => (&CP874, [0x7F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
+        912 => (&CP912, [0x7F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
+        915 => (&CP915, [0x7F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
         _ => panic!("unknow code page"),
     }
 }

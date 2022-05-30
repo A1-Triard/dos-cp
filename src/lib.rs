@@ -2,39 +2,74 @@
 
 #![no_std]
 
-use core::num::{NonZeroU8, NonZeroU32};
+use core::mem::align_of;
+use core::num::NonZeroU32;
 
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct CP {
-    to_uni: unsafe fn(u8) -> Option<NonZeroU32>,
-    from_uni: unsafe fn(u32) -> Option<NonZeroU8>,
+#[doc(hidden)]
+#[inline]
+pub fn hash(mut w: u16, mask: &[u8; 8]) -> u8 {
+    let mut mask = &mask[..];
+    let mut res = 0;
+    for _ in 0 .. 8 {
+        res |= (w as u8) & mask[0];
+        w >>= 1;
+        mask = &mask[1 ..];
+    }
+    res
 }
 
-impl CP {
+const CODE_PAGE_SIZE: usize = 528;
+
+#[derive(Debug, Clone)]
+#[repr(C, align(8))]
+pub struct CodePage([u8; CODE_PAGE_SIZE]);
+
+impl CodePage {
+    pub unsafe fn new_unchecked(bytes: [u8; CODE_PAGE_SIZE]) -> Self {
+        CodePage(bytes)
+    }
+
+    pub fn into_bytes(self) -> [u8; CODE_PAGE_SIZE] {
+        self.0
+    }
+
+    fn to_upper_char(&self, c: u8) -> Option<char> {
+        let offset = 16 + 2 * c as usize;
+        let hb = self.0[offset];
+        let lb = self.0[offset + 1];
+        NonZeroU32::new(((hb as u32) << 8) | (lb as u32))
+            .map(|x| unsafe { char::from_u32_unchecked(x.get()) })
+    }
+
     pub fn to_char(&self, c: u8) -> Option<char> {
-        if c < 128 {
+        if c >> 7 == 0 {
             Some(c as char)
         } else {
-            unsafe { ((self.to_uni)(c & 0x7F)).map(|x| char::from_u32_unchecked(x.get())) }
+            self.to_upper_char(c & 0x7F)
         }
     }
 
     pub fn from_char(&self, c: char) -> Option<u8> {
-        if (c as u32) < 128 {
+        if (c as u32) >> 7 == 0 {
             Some(c as u32 as u8)
+        } else if (c as u32) >> 16 != 0 {
+            None
         } else {
-            unsafe { (self.from_uni)(c as u32) }.map(|x| x.get())
+            let w = (c as u32) as u16;
+            assert!(align_of::<[u8; 8]>() <= align_of::<CodePage>());
+            let mask = unsafe { &*(self.0.as_ptr() as *const [u8; 8]).offset(1) };
+            let offset = 16 + 256 + 2 * hash(w, mask) as usize;
+            let try_1 = self.0[offset];
+            if try_1 >> 7 != 0 { return None; }
+            if self.to_upper_char(try_1) == Some(c) {
+                return Some(0x80 | try_1);
+            }
+            let try_2 = self.0[offset + 1];
+            if try_2 >> 7 != 0 { return None; }
+            if self.to_upper_char(try_2) == Some(c) {
+                return Some(0x80 | try_2);
+            }
+            None
         }
-    }
-}
-
-include!(concat!(env!("OUT_DIR"), "/generated.rs"));
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
     }
 }
