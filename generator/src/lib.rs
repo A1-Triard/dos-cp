@@ -16,17 +16,24 @@ pub trait CodePageGenExt {
 
 impl CodePageGenExt for CodePage {
     fn generate(code_page: u16) -> CodePage {
-        let (base_table, mask) = base_table_and_mask(code_page);
+        let (base_table, add, shift, mask) = base_table_and_hash_params(code_page);
         let mut res: [MaybeUninit<u8>; 528] = unsafe { MaybeUninit::uninit().assume_init() };
         res[0].write(b'C');
-        res[1].write(b'O');
-        res[2].write(b'D');
-        res[3].write(b'P');
-        res[4].write(b'G');
-        res[5].write(1);
+        res[1].write(b'D');
+        res[2].write(b'P');
+        res[3].write(b'G');
+        res[4].write(1);
+        res[5].write(0);
         res[6].write(code_page as u8);
         res[7].write((code_page >> 8) as u8);
-        res[8 .. 16].copy_from_slice(unsafe { transmute(&mask[..]) });
+        res[8].write(add as u8);
+        res[9].write((add >> 8) as u8);
+        res[10].write(shift);
+        res[11].write(0);
+        res[12].write(mask as u8);
+        res[13].write((mask >> 8) as u8);
+        res[14].write(0);
+        res[15].write(0);
         let base_table = base_table.iter().copied().map(|c| {
             if c == '?' { return 0; }
             let c: u16 = (c as u32).try_into()
@@ -41,7 +48,7 @@ impl CodePageGenExt for CodePage {
         let second_part = &mut res[16 + 256 .. 16 + 512];
         let mut filled = [Filled::None; 128];
         for (i, w) in base_table.into_iter().enumerate().filter(|&(_, w)| w != 0) {
-            let hash = hash(w, &mask);
+            let hash = hash(w, add, shift, mask);
             let filled = &mut filled[hash as usize];
             match filled {
                 Filled::None => {
@@ -78,26 +85,26 @@ impl CodePageGenExt for CodePage {
     }
 }
 
-fn base_table_and_mask(code_page: u16) -> (&'static [char; 128], [u8; 8]) {
+fn base_table_and_hash_params(code_page: u16) -> (&'static [char; 128], u16, u8, u16) {
     match code_page {
-        437 => (&CP437, [0xD1, 0x19, 0x05, 0x00, 0xD1, 0x19, 0x00, 0x00]),
-        737 => (&CP737, [0x0F, 0x1C, 0x06, 0x00, 0x0F, 0x1C, 0x00, 0x00]),
-        850 => (&CP850, [0xF0, 0x07, 0x07, 0x00, 0xF0, 0x07, 0x00, 0x00]),
-        852 => (&CP852, [0x3D, 0x06, 0x03, 0x00, 0x3D, 0x06, 0x00, 0x00]),
-        855 => (&CP855, [0x3F, 0x01, 0x06, 0x00, 0x3F, 0x01, 0x00, 0x00]),
-        857 => (&CP857, [0x7F, 0x00, 0x01, 0x00, 0x7F, 0x00, 0x00, 0x00]),
-        858 => (&CP858, [0xF0, 0x07, 0x07, 0x00, 0xF0, 0x07, 0x00, 0x00]),
-        860 => (&CP860, [0x2F, 0x0A, 0x05, 0x00, 0x2F, 0x0A, 0x00, 0x00]),
-        861 => (&CP861, [0x3D, 0x06, 0x07, 0x00, 0x53, 0x16, 0x00, 0x00]),
-        862 => (&CP862, [0xCC, 0x0D, 0x07, 0x00, 0xCC, 0x0D, 0x00, 0x00]),
-        863 => (&CP863, [0x7D, 0x08, 0x01, 0x00, 0x7D, 0x08, 0x00, 0x00]),
-        864 => (&CP864, [0x7F, 0x00, 0x01, 0x00, 0x7F, 0x00, 0x00, 0x00]),
-        865 => (&CP865, [0xD1, 0x19, 0x05, 0x00, 0xD1, 0x19, 0x00, 0x00]),
-        866 => (&CP866, [0xEE, 0x01, 0x03, 0x00, 0xEE, 0x01, 0x00, 0x00]),
-        869 => (&CP869, [0x7E, 0x02, 0x03, 0x00, 0x7E, 0x02, 0x00, 0x00]),
-        874 => (&CP874, [0xF0, 0x07, 0x04, 0x00, 0xF0, 0x07, 0x00, 0x00]),
-        912 => (&CP912, [0xFC, 0x01, 0x04, 0x00, 0xFC, 0x01, 0x00, 0x00]),
-        915 => (&CP915, [0xE0, 0x0F, 0x05, 0x00, 0xE0, 0x0F, 0x00, 0x00]),
+        437 => (&CP437, 0x19D1, 5, 0x19D1),
+        737 => (&CP737, 0x1C0F, 6, 0x1C0F),
+        850 => (&CP850, 0x07F0, 7, 0x07F0),
+        852 => (&CP852, 0x063D, 3, 0x063D),
+        855 => (&CP855, 0x013F, 6, 0x013F),
+        857 => (&CP857, 0x007F, 1, 0x007F),
+        858 => (&CP858, 0x07F0, 7, 0x07F0),
+        860 => (&CP860, 0x0A2F, 5, 0x0A2F),
+        861 => (&CP861, 0x063D, 7, 0x1653),
+        862 => (&CP862, 0x0DCC, 7, 0x0DCC),
+        863 => (&CP863, 0x087D, 1, 0x087D),
+        864 => (&CP864, 0x007F, 1, 0x007F),
+        865 => (&CP865, 0x19D1, 5, 0x19D1),
+        866 => (&CP866, 0x01EE, 3, 0x01EE),
+        869 => (&CP869, 0x027E, 3, 0x027E),
+        874 => (&CP874, 0x07F0, 4, 0x07F0),
+        912 => (&CP912, 0x01FC, 4, 0x01FC),
+        915 => (&CP915, 0x0FE0, 5, 0x0FE0),
         _ => panic!("unknow code page"),
     }
 }
@@ -481,5 +488,11 @@ mod test {
         } else {
             TestResult::discard()
         }
+    }
+
+    #[quickcheck]
+    fn generated_page_is_valid(code_page: KnownCodePage) -> bool {
+        let code_page = CodePage::generate(KNOWN_CODE_PAGES[code_page.0 as usize]);
+        CodePage::new(code_page.into_bytes()).is_some()
     }
 }
