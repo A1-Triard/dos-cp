@@ -29,6 +29,10 @@ const CODE_PAGE_SIZE: usize = 528;
 pub struct CodePage([u8; CODE_PAGE_SIZE]);
 
 impl CodePage {
+    /// # Safety
+    ///
+    /// This function may not be called with bytes
+    /// are not obtained from the [`into_bytes`](CodePage::into_bytes) method.
     pub const unsafe fn new_unchecked(bytes: [u8; CODE_PAGE_SIZE]) -> Self {
         CodePage(bytes)
     }
