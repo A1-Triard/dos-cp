@@ -1,0 +1,23 @@
+#!/bin/sh
+set -eu
+
+cd "$(dirname -- "$(realpath -- "$0")")"
+
+./generate_table CP437
+./generate_table CP737
+./generate_table CP850
+./generate_table CP852
+./generate_table CP855
+./generate_table CP857
+./generate_table CP858
+./generate_table CP860
+./generate_table CP861
+./generate_table CP862
+./generate_table CP863
+./generate_table CP864
+./generate_table CP865
+./generate_table CP866
+./generate_table CP869
+./generate_table CP874
+./generate_table CP912
+./generate_table CP915

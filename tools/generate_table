@@ -27,6 +27,7 @@ range="$(seq 128 255)"
 for i in $range; do
     c="$(chr "$i")"
     echo_n__ "$c" >> "$1".bytes || exit 1
+    #echo_n__ "/$c=" >> "$1".bytes || exit 1
 done
 
 while true; do
