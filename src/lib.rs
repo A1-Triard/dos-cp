@@ -7,13 +7,17 @@ use core::num::NonZeroU32;
 
 #[doc(hidden)]
 #[inline]
-pub fn hash(mut w: u16, mask: &[u8; 8]) -> u8 {
-    let mut mask = &mask[..];
+pub fn hash(w: u16, mask: &[u8; 8]) -> u8 {
+    let add = (mask[0] as u16) | ((mask[1] as u16) << 8);
+    let shift = mask[2];
+    let mut mask = (mask[4] as u16) | ((mask[5] as u16) << 8);
+    let mut w = w ^ ((w + add) << shift);
     let mut res = 0;
-    for _ in 0 .. 8 {
-        res |= (w as u8) & mask[0];
+    for _ in 0 .. 16 {
+        res <<= (mask & 0x0001) as u8;
+        res |= (w & mask & 0x0001) as u8;
         w >>= 1;
-        mask = &mask[1 ..];
+        mask >>= 1;
     }
     res
 }

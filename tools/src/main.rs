@@ -1,18 +1,18 @@
 use arrayvec::ArrayVec;
+use std::cmp::max;
 use std::fs::File;
 use std::io::BufReader;
 use utf8_chars::BufReadCharsExt;
 
-pub fn find_mask(table: &[char]) -> u32 {
+fn apply_mask(u: u32, mask: u32, n: u8) -> u32 {
+    (u ^ ((u + mask) >> n)) & mask
+}
+
+pub fn find_mask(table: &[char]) -> (u32, u8) {
     let mut bits: ArrayVec<u8, 32> = ArrayVec::new();
-    for bit in 0 .. 32 {
-        let mask = 1u32 << bit;
-        let value = (table[0] as u32) & mask;
-        if table.iter().any(|&x| (x as u32) & mask != value) {
-            bits.push(bit);
-        }
+    for bit in 0 .. 16 {
+        bits.push(bit);
     }
-    assert!(bits.len() <= 16);
     let bit_index_range = 0 .. bits.len() as u8;
     let mut masks = bit_index_range.clone().into_iter()
         .flat_map(|x| bit_index_range.clone().into_iter().map(move |b| (x, b)))
@@ -38,27 +38,39 @@ pub fn find_mask(table: &[char]) -> u32 {
     ;
     masks.sort();
     masks.dedup();
-    let mut masks = masks.into_iter().map(|mask| {
-        let mut table = table.iter().copied().map(|c| (c as u32) & mask).collect::<Vec<_>>();
+    let mut masks = (1 .. 8).into_iter().flat_map(|n| masks.iter().copied().map(move |m| (n, m))).map(|(n, mask)| {
+        let mut table = table.iter().copied().map(|c| apply_mask(c as u32, mask, n)).collect::<Vec<_>>();
         table.sort();
-        let dups = table.into_iter().fold((0usize, 0usize, None), |(mut total, mut cur, prev_x), x| {
+        let dups = table.into_iter().fold((0usize, 0usize, 0usize, None), |(mut count, mut total, mut cur, prev_x), x| {
             if Some(x) == prev_x {
                 cur += 1;
             } else {
-                total = total.max(cur);
-                cur = 0;
+                if cur > total {
+                    total = cur;
+                    count = 1;
+                } else if cur == total {
+                    count += 1;
+                }
+                cur = 1;
             }
-            (total, cur, Some(x))
+            (count, total, cur, Some(x))
         });
-        let dups = dups.0.max(dups.1);
-        (mask, dups)
+        let (dups, count) = if dups.2 > dups.1 {
+            (dups.2, 1)
+        } else {
+            (dups.1, dups.0)
+        };
+        (mask, dups, count, n)
     }).collect::<Vec<_>>();
-    masks.sort_by_key(|&(_, dups)| dups);
-    let dups = masks[0].1;
-    assert!(dups == 2 || dups == 1);
-    let trim = masks.iter().take_while(|x| x.1 <= 2).count();
+    masks.sort_by_key(|&(_, _, count, _)| count);
+    masks.sort_by_key(|&(_, dups, _, _)| dups);
+    let dups = max(2, masks[0].1);
+    let count = masks[0].2;
+    assert!((dups == 3 && count < 3) || dups == 2);
+    let trim = masks.iter().take_while(|x| x.1 <= dups).count();
+    println!("{} {}", dups, count);
     masks.truncate(trim);
-    for (ref mask, n) in &mut masks {
+    for (ref mask, n, _, _) in &mut masks {
         let b00 = mask & 0x00000001; let b01 = mask & 0x00000002; let b02 = mask & 0x00000004; let b03 = mask & 0x00000008;
         let b04 = mask & 0x00000010; let b05 = mask & 0x00000020; let b06 = mask & 0x00000040; let b07 = mask & 0x00000080;
         let b08 = mask & 0x00000100; let b09 = mask & 0x00000200; let b10 = mask & 0x00000400; let b11 = mask & 0x00000800;
@@ -78,11 +90,12 @@ pub fn find_mask(table: &[char]) -> u32 {
         }).0;
         *n = chunks;
     }
-    masks.sort_by_key(|&(_, chunks)| chunks);
-    masks[0].0
+    masks.sort_by_key(|&(_, chunks, _, _)| chunks);
+    (masks[0].0, masks[0].3)
 }
 
 fn main() {
+    /*
     for cp in [
         "CP874"
     ] {
@@ -96,9 +109,9 @@ fn main() {
             println!("\\u{{{:04X}}}", c as u32);
         }
     }
-    /*/
+    */
     for cp in [
-        "CP437", "CP737", "CP850", "CP852", "CP855", "CP857", "CP858", "CP860",
+        /*"CP437", "CP737", "CP850", "CP852",*/ "CP855", "CP857", "CP858", "CP860",
         "CP861", "CP862", "CP863", "CP864", "CP865", "CP866", "CP869", "CP874",
         "CP912", "CP915",
     ] {
@@ -111,7 +124,6 @@ fn main() {
         ;
         let mask = find_mask(&chars[..]);
 
-        println!("{}: {:04X}", cp, mask);
+        println!("{}: {:04X} shift {}", cp, mask.0, mask.1);
     }
-    */
 }
