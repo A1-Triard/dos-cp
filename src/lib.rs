@@ -8,8 +8,7 @@ use core::num::NonZeroU32;
 #[inline]
 pub fn hash(w: u16, p: u16) -> u8 {
     let w = w.wrapping_add(p);
-    let shift = (p >> 4) & 0x000F;
-    ((w ^ (w >> shift)) & 0x007F) as u8
+    ((w ^ (w >> 8)) & 0x007F) as u8
 }
 
 const CODE_PAGE_SIZE: usize = 520;

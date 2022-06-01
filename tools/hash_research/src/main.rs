@@ -6,8 +6,7 @@ use utf8_chars::BufReadCharsExt;
 
 fn hash(u: u16, add: u16) -> u8 {
     let u = u.wrapping_add(add);
-    let shift = (add >> 4) & 0x000F;
-    ((u ^ (u >> shift)) & 0x7F) as u8
+    ((u ^ (u >> 8)) & 0x7F) as u8
 }
 
 pub fn find_hash(table: &[char]) -> u16 {
@@ -31,7 +30,7 @@ pub fn find_hash(table: &[char]) -> u16 {
 fn main() {
     /*
     for cp in [
-        "CP874"
+        "CP720"
     ] {
         let table = File::open(cp).expect("codepage table not found");
         let chars = BufReader::new(table)
@@ -39,13 +38,14 @@ fn main() {
             .map(|x| x.expect("invalid char in codepage table"))
             .collect::<ArrayVec<_, 128>>()
         ;
+        assert!(chars.len() == 128);
         for c in chars {
             println!("\\u{{{:04X}}}", c as u32);
         }
     }
     */
     for cp in [
-        "CP437", "CP737", "CP850", "CP852", "CP855", "CP857", "CP858", "CP860",
+        "CP437", "CP720", "CP737", "CP850", "CP852", "CP855", "CP857", "CP858", "CP860",
         "CP861", "CP862", "CP863", "CP864", "CP865", "CP866", "CP869", "CP874",
         "CP912", "CP915",
     ] {

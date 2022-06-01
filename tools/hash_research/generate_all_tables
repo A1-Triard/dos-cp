@@ -3,6 +3,7 @@ set -eu
 
 cd "$(dirname -- "$(realpath -- "$0")")"
 
+cp ../CP720 .
 ./generate_table CP437
 ./generate_table CP737
 ./generate_table CP850
