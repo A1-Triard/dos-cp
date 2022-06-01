@@ -1,42 +1,31 @@
 use arrayvec::ArrayVec;
+use std::cmp::max;
 use std::fs::File;
 use std::io::BufReader;
 use utf8_chars::BufReadCharsExt;
 
-fn hash(u: u16, add: u16, add_shift: u8, shift: u8) -> u8 {
+fn hash(u: u16, add: u16) -> u8 {
     let u = u.wrapping_add(add);
-    (((u ^ (u << add_shift)) >> shift) & 0x7F) as u8
+    let shift = (add >> 4) & 0x000F;
+    ((u ^ (u >> shift)) & 0x7F) as u8
 }
 
-pub fn find_hash(table: &[char]) -> (u16, u8, u8) {
-    let adds = (0 ..= u16::MAX).into_iter();
-    let shifted_adds = adds.flat_map(|add| (0 .. 16).into_iter().map(move |add_shift| (add, add_shift)));
-    let hashes = shifted_adds.flat_map(|(add, add_shift)| (0 .. 16).into_iter().map(move |shift| (add, add_shift, shift)));
-    hashes.filter_map(|p| {
-        let mut table = table.iter().copied().map(|c| hash(c as u32 as u16, p.0, p.1, p.2)).collect::<ArrayVec<_, 128>>();
+pub fn find_hash(table: &[char]) -> u16 {
+    (0 ..= u16::MAX).filter_map(|p| {
+        let mut table = table.iter().copied().map(|c| hash(c as u32 as u16, p)).collect::<ArrayVec<_, 128>>();
         table.sort();
-        let dups = table.into_iter().fold((0usize, 0usize, 0usize, None), |(mut count, mut total, mut cur, prev_x), x| {
+        let dups = table.into_iter().fold((0usize, 0usize, None), |(mut total, mut cur, prev_x), x| {
             if Some(x) == prev_x {
                 cur += 1;
             } else {
-                if cur > total {
-                    total = cur;
-                    count = 1;
-                } else if cur == total {
-                    count += 1;
-                }
+                total = max(total, cur);
                 cur = 1;
             }
-            (count, total, cur, Some(x))
+            (total, cur, Some(x))
         });
-        let (dups, count) = if dups.2 > dups.1 {
-            (dups.2, 1)
-        } else {
-            (dups.1, dups.0)
-        };
-        if dups > 2 { return None; }
-        Some((p, dups, count))
-    }).next().unwrap().0
+        let dups = max(dups.0, dups.1);
+        if dups > 2 { None } else { Some(p) }
+    }).next().unwrap()
 }
 
 fn main() {
@@ -69,6 +58,6 @@ fn main() {
         ;
         let hash = find_hash(&chars[..]);
 
-        println!("{}: add {:04X} shift {} and then shift {}", cp, hash.0, hash.1, hash.2);
+        println!("{}: {:04X}", cp, hash);
     }
 }

@@ -6,23 +6,13 @@ use core::num::NonZeroU32;
 
 #[doc(hidden)]
 #[inline]
-pub fn hash(w: u16, add: u16, shift: u8, mut mask: u16) -> u8 {
-    let mut w = w ^ (w.wrapping_add(add) << shift);
-    let mut res = 0;
-    for _ in 0 .. 16 {
-        res <<= (mask & 0x0001) as u8;
-        res |= (w & mask & 0x0001) as u8;
-        w >>= 1;
-        mask >>= 1;
-    }
-    res
+pub fn hash(w: u16, p: u16) -> u8 {
+    let w = w.wrapping_add(p);
+    let shift = (p >> 4) & 0x000F;
+    ((w ^ (w >> shift)) & 0x007F) as u8
 }
 
-fn bits_count(mask: u16) -> u8 {
-    (0 .. 16).map(|b| ((mask >> b) & 0x0001) as u8).sum()
-}
-
-const CODE_PAGE_SIZE: usize = 528;
+const CODE_PAGE_SIZE: usize = 520;
 
 #[derive(Debug, Clone)]
 #[repr(C, align(8))]
@@ -39,15 +29,9 @@ impl CodePage {
 
     pub fn new(bytes: [u8; CODE_PAGE_SIZE]) -> Option<Self> {
         if bytes[0] != b'C' { return None; }
-        if bytes[1] != b'D' { return None; }
-        if bytes[2] != b'P' { return None; }
-        if bytes[3] != b'G' { return None; }
-        if bytes[4] != 1 { return None; }
-        if bytes[5] != 0 { return None; }
-        if bytes[10] >= 16 { return None; }
-        if bytes[11] != 0 { return None; }
-        let mask = (bytes[12] as u16) | ((bytes[13] as u16) << 8);
-        if bits_count(mask) != 7 { return None; }
+        if bytes[1] != b'P' { return None; }
+        if bytes[2] != 1 { return None; }
+        if bytes[3] != 0 { return None; }
         Some(unsafe { Self::new_unchecked(bytes) })
     }
 
@@ -56,7 +40,7 @@ impl CodePage {
     }
 
     fn to_upper_half_char(&self, c: u8) -> Option<char> {
-        let offset = 16 + 2 * c as usize;
+        let offset = (CODE_PAGE_SIZE - 512) + 2 * c as usize;
         let hb = self.0[offset];
         let lb = self.0[offset + 1];
         NonZeroU32::new(((hb as u32) << 8) | (lb as u32))
@@ -78,10 +62,8 @@ impl CodePage {
             None
         } else {
             let w = (c as u32) as u16;
-            let add = (self.0[8] as u16) | ((self.0[9] as u16) << 8);
-            let shift = self.0[10];
-            let mask = (self.0[12] as u16) | ((self.0[13] as u16) << 8);
-            let offset = 16 + 256 + 2 * hash(w, add, shift, mask) as usize;
+            let hash_param = (self.0[6] as u16) | ((self.0[7] as u16) << 8);
+            let offset = (CODE_PAGE_SIZE - 512) + 256 + 2 * hash(w, hash_param) as usize;
             let try_1 = self.0[offset];
             if try_1 >> 7 != 0 { return None; }
             if self.to_upper_half_char(try_1) == Some(c) {

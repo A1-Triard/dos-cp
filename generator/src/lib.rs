@@ -18,39 +18,31 @@ pub trait CodePageGenExt {
 
 impl CodePageGenExt for CodePage {
     fn generate(code_page: u16) -> CodePage {
-        let (base_table, add, shift, mask) = base_table_and_hash_params(code_page);
-        let mut res: [MaybeUninit<u8>; 528] = unsafe { MaybeUninit::uninit().assume_init() };
+        let (base_table, hash_param) = base_table_and_hash_param(code_page);
+        let mut res: [MaybeUninit<u8>; 520] = unsafe { MaybeUninit::uninit().assume_init() };
         res[0].write(b'C');
-        res[1].write(b'D');
-        res[2].write(b'P');
-        res[3].write(b'G');
-        res[4].write(1);
-        res[5].write(0);
-        res[6].write(code_page as u8);
-        res[7].write((code_page >> 8) as u8);
-        res[8].write(add as u8);
-        res[9].write((add >> 8) as u8);
-        res[10].write(shift);
-        res[11].write(0);
-        res[12].write(mask as u8);
-        res[13].write((mask >> 8) as u8);
-        res[14].write(0);
-        res[15].write(0);
+        res[1].write(b'P');
+        res[2].write(1);
+        res[3].write(0);
+        res[4].write(code_page as u8);
+        res[5].write((code_page >> 8) as u8);
+        res[6].write(hash_param as u8);
+        res[7].write((hash_param >> 8) as u8);
         let base_table = base_table.iter().copied().map(|c| {
             if c == '?' { return 0; }
             let c: u16 = (c as u32).try_into()
                 .expect("too big char, bit needs to be preremapped");
             c
         });
-        let mut first_part = &mut res[16 .. 16 + 256];
+        let mut first_part = &mut res[8 .. 8 + 256];
         for byte in base_table.clone().flat_map(|w| [(w >> 8) as u8, w as u8]) {
             first_part[0].write(byte);
             first_part = &mut first_part[1 ..];
         }
-        let second_part = &mut res[16 + 256 .. 16 + 512];
+        let second_part = &mut res[8 + 256 .. 8 + 512];
         let mut filled = [Filled::None; 128];
         for (i, w) in base_table.into_iter().enumerate().filter(|&(_, w)| w != 0) {
-            let hash = hash(w, add, shift, mask);
+            let hash = hash(w, hash_param);
             let filled = &mut filled[hash as usize];
             match filled {
                 Filled::None => {
@@ -87,26 +79,26 @@ impl CodePageGenExt for CodePage {
     }
 }
 
-fn base_table_and_hash_params(code_page: u16) -> (&'static [char; 128], u16, u8, u16) {
+fn base_table_and_hash_param(code_page: u16) -> (&'static [char; 128], u16) {
     match code_page {
-        437 => (&CP437, 0x19D1, 5, 0x19D1),
-        737 => (&CP737, 0x1C0F, 6, 0x1C0F),
-        850 => (&CP850, 0x07F0, 7, 0x07F0),
-        852 => (&CP852, 0x063D, 3, 0x063D),
-        855 => (&CP855, 0x013F, 6, 0x013F),
-        857 => (&CP857, 0x007F, 1, 0x007F),
-        858 => (&CP858, 0x07F0, 7, 0x07F0),
-        860 => (&CP860, 0x0A2F, 5, 0x0A2F),
-        861 => (&CP861, 0x063D, 7, 0x1653),
-        862 => (&CP862, 0x0DCC, 7, 0x0DCC),
-        863 => (&CP863, 0x087D, 1, 0x087D),
-        864 => (&CP864, 0x007F, 1, 0x007F),
-        865 => (&CP865, 0x19D1, 5, 0x19D1),
-        866 => (&CP866, 0x01EE, 3, 0x01EE),
-        869 => (&CP869, 0x027E, 3, 0x027E),
-        874 => (&CP874, 0x07F0, 4, 0x07F0),
-        912 => (&CP912, 0x01FC, 4, 0x01FC),
-        915 => (&CP915, 0x0FE0, 5, 0x0FE0),
+        437 => (&CP437, 0x0457),
+        737 => (&CP737, 0x0038),
+        850 => (&CP850, 0x0010),
+        852 => (&CP852, 0x0D88),
+        855 => (&CP855, 0x0030),
+        857 => (&CP857, 0x0010),
+        858 => (&CP858, 0x0010),
+        860 => (&CP860, 0x0055),
+        861 => (&CP861, 0x0160),
+        862 => (&CP862, 0x059F),
+        863 => (&CP863, 0x0294),
+        864 => (&CP864, 0x00A0),
+        865 => (&CP865, 0x0457),
+        866 => (&CP866, 0x0031),
+        869 => (&CP869, 0x0024),
+        874 => (&CP874, 0x0010),
+        912 => (&CP912, 0x0011),
+        915 => (&CP915, 0x0010),
         _ => panic!("unknow code page"),
     }
 }
@@ -479,6 +471,16 @@ mod test {
 
         fn shrink(&self) -> Box<dyn Iterator<Item=Self>> {
             Box::new((0 .. self.0).into_iter().rev().map(KnownCodePage))
+        }
+    }
+
+    #[quickcheck]
+    fn to_char_is_from_char_inverse(c: char, code_page: KnownCodePage) -> TestResult {
+        let code_page = CodePage::generate(KNOWN_CODE_PAGES[code_page.0 as usize]);
+        if let Some(b) = code_page.from_char(c) {
+            TestResult::from_bool(code_page.to_char(b) == Some(c))
+        } else {
+            TestResult::discard()
         }
     }
 
