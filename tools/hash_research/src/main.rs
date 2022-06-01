@@ -10,19 +10,20 @@ fn hash(u: u16, add: u16) -> u8 {
 }
 
 pub fn find_hash(table: &[char]) -> u16 {
-    (0 ..= u16::MAX).filter_map(|p| {
+    (0 ..= u16::MAX).filter(|&p| p & 0x0080 != 0 && p & 0x8000 != 0).filter_map(|p| {
         let mut table = table.iter().copied().map(|c| hash(c as u32 as u16, p)).collect::<ArrayVec<_, 128>>();
         table.sort();
-        let dups = table.into_iter().fold((0usize, 0usize, None), |(mut total, mut cur, prev_x), x| {
+        let dups = table.into_iter().fold((false, 0usize, 0usize, None), |(zero, mut total, mut cur, prev_x), x| {
             if Some(x) == prev_x {
                 cur += 1;
             } else {
                 total = max(total, cur);
                 cur = 1;
             }
-            (total, cur, Some(x))
+            (if x == 0x7F { true } else { zero }, total, cur, Some(x))
         });
-        let dups = max(dups.0, dups.1);
+        if dups.0 { return None; }
+        let dups = max(dups.1, dups.2);
         if dups > 2 { None } else { Some(p) }
     }).next().unwrap()
 }

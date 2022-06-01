@@ -19,30 +19,25 @@ pub trait CodePageGenExt {
 impl CodePageGenExt for CodePage {
     fn generate(code_page: u16) -> CodePage {
         let (base_table, hash_param) = base_table_and_hash_param(code_page);
-        let mut res: [MaybeUninit<u8>; 520] = unsafe { MaybeUninit::uninit().assume_init() };
-        res[0].write(b'C');
-        res[1].write(b'P');
-        res[2].write(1);
-        res[3].write(0);
-        res[4].write(code_page as u8);
-        res[5].write((code_page >> 8) as u8);
-        res[6].write(hash_param as u8);
-        res[7].write((hash_param >> 8) as u8);
+        let mut res: [MaybeUninit<u8>; 512] = unsafe { MaybeUninit::uninit().assume_init() };
+        res[510].write(hash_param as u8);
+        res[511].write((hash_param >> 8) as u8);
         let base_table = base_table.iter().copied().map(|c| {
             if c == '?' { return 0; }
             let c: u16 = (c as u32).try_into()
                 .expect("too big char, bit needs to be preremapped");
             c
         });
-        let mut first_part = &mut res[8 .. 8 + 256];
+        let mut first_part = &mut res[.. 256];
         for byte in base_table.clone().flat_map(|w| [(w >> 8) as u8, w as u8]) {
             first_part[0].write(byte);
             first_part = &mut first_part[1 ..];
         }
-        let second_part = &mut res[8 + 256 .. 8 + 512];
-        let mut filled = [Filled::None; 128];
+        let second_part = &mut res[256 ..];
+        let mut filled = [Filled::None; 127];
         for (i, w) in base_table.into_iter().enumerate().filter(|&(_, w)| w != 0) {
             let hash = hash(w, hash_param);
+            debug_assert!((hash >> 7) == 0 && hash != 0x7F, "invalid hash");
             let filled = &mut filled[hash as usize];
             match filled {
                 Filled::None => {
@@ -53,14 +48,7 @@ impl CodePageGenExt for CodePage {
                     second_part[(2 * hash + 1) as usize].write(i as u8);
                     *filled = Filled::Full;
                 },
-                Filled::Full => panic!("\
-                    invalid base table/mask (collision {:02X} {:02X} {:02X}, hash {:02X})\
-                ",
-                    128 + unsafe { second_part[(2 * hash) as usize].assume_init_ref() },
-                    128 + unsafe { second_part[(2 * hash + 1) as usize].assume_init_ref() },
-                    128 + i,
-                    hash,
-                ),
+                Filled::Full => unreachable!("invalid hash / base table"),
             }
         }
         for (i, filled) in filled.into_iter().enumerate() {
@@ -75,35 +63,35 @@ impl CodePageGenExt for CodePage {
                 Filled::Full => { }
             }
         }
-        unsafe { CodePage::new_unchecked(transmute(res)) }
+        CodePage::new(unsafe { transmute(res) })
     }
 }
 
 fn base_table_and_hash_param(code_page: u16) -> (&'static [char; 128], u16) {
     match code_page {
-        437 => (&CP437, 0x0CEF),
-        720 => (&CP720, 0x01EC),
-        737 => (&CP737, 0x002C),
-        850 => (&CP850, 0x0004),
-        852 => (&CP852, 0x0604),
-        855 => (&CP855, 0x0020),
-        857 => (&CP857, 0x0014),
-        858 => (&CP858, 0x0004),
-        860 => (&CP860, 0x07AD),
-        861 => (&CP861, 0x02F1),
-        862 => (&CP862, 0x0EA8),
-        863 => (&CP863, 0x0AE9),
-        864 => (&CP864, 0x004A),
-        865 => (&CP865, 0x0CEF),
-        866 => (&CP866, 0x02E9),
-        869 => (&CP869, 0x03DC),
-        874 => (&CP874, 0x0000),
-        912 => (&CP912, 0x003A),
-        915 => (&CP915, 0x0000),
+        437 => (&CP437, 0x9F8D),
+        720 => (&CP720, 0x8EAC),
+        737 => (&CP737, 0x9AF8),
+        850 => (&CP850, 0x80F1),
+        852 => (&CP852, 0xF5F4),
+        855 => (&CP855, 0x808F),
+        857 => (&CP857, 0x80EE),
+        858 => (&CP858, 0x80F1),
+        860 => (&CP860, 0x9FCD),
+        861 => (&CP861, 0x83AD),
+        862 => (&CP862, 0xBB95),
+        863 => (&CP863, 0xEAC8),
+        864 => (&CP864, 0x80A2),
+        865 => (&CP865, 0x9F8D),
+        866 => (&CP866, 0x8398),
+        869 => (&CP869, 0x8B8F),
+        874 => (&CP874, 0x8080),
+        912 => (&CP912, 0x8086),
+        915 => (&CP915, 0x8080),
         _ => panic!("unknow code page"),
     }
 }
-
+ 
 const CP437: [char; 128] = [
     'Ç', 'ü', 'é', 'â', 'ä', 'à', 'å', 'ç',
     'ê', 'ë', 'è', 'ï', 'î', 'ì', 'Ä', 'Å',
@@ -471,13 +459,6 @@ mod test {
     use quickcheck::{Arbitrary, Gen, TestResult};
     use quickcheck_macros::quickcheck;
 
-    #[test]
-    fn generate_all() {
-        for &cp in KNOWN_CODE_PAGES {
-            CodePage::generate(cp);
-        }
-    }
-
     #[derive(Debug, Copy, Clone)]
     struct KnownCodePage(u8);
 
@@ -524,11 +505,5 @@ mod test {
         } else {
             TestResult::discard()
         }
-    }
-
-    #[quickcheck]
-    fn generated_page_is_valid(code_page: KnownCodePage) -> bool {
-        let code_page = CodePage::generate(KNOWN_CODE_PAGES[code_page.0 as usize]);
-        CodePage::new(code_page.into_bytes()).is_some()
     }
 }
