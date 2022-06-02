@@ -19,5 +19,9 @@ exclude = [
     "tools",
 ]
 
+[features]
+default = ["nightly"]
+nightly = []
+
 [badges]
 maintenance = { status = "actively-developed" }
