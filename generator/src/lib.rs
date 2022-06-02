@@ -63,7 +63,7 @@ impl CodePageGenExt for CodePage {
                 Filled::Full => { }
             }
         }
-        CodePage::new(unsafe { transmute(res) })
+        CodePage(unsafe { transmute(res) })
     }
 }
 

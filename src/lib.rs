@@ -22,17 +22,9 @@ const CODE_PAGE_SIZE: usize = 512;
 
 #[derive(Debug, Clone)]
 #[repr(C, align(8))]
-pub struct CodePage([u8; CODE_PAGE_SIZE]);
+pub struct CodePage(pub [u8; CODE_PAGE_SIZE]);
 
 impl CodePage {
-    pub const fn new(bytes: [u8; CODE_PAGE_SIZE]) -> Self {
-        CodePage(bytes)
-    }
-
-    pub const fn into_bytes(self) -> [u8; CODE_PAGE_SIZE] {
-        self.0
-    }
-
     #[cfg(feature="nightly")]
     const fn to_upper_half_char(&self, c: u8) -> Option<char> {
         let offset = 2 * c as usize;
