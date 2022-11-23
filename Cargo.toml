@@ -1,8 +1,8 @@
 [package]
 edition = "2021"
 name = "dos-cp"
-version = "0.0.3"
-rust-version = "1.67"
+version = "0.0.2"
+rust-version = "1.61"
 authors = ["warlock <internalmike@gmail.com>"]
 description = "DOS code pages."
 readme = "README.md"
@@ -18,6 +18,10 @@ exclude = [
     "ensure_no_std",
     "tools",
 ]
+
+[features]
+default = ["nightly"]
+nightly = []
 
 [badges]
 maintenance = { status = "actively-developed" }
