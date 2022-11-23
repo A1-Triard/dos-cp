@@ -3,6 +3,8 @@
 //! * `"nightly"`
 //! Enabled by default. Disable to make the library compatible with stable and beta Rust channels.
 
+#![cfg_attr(feature="nightly", feature(const_char_from_u32_unchecked))]
+
 #![deny(warnings)]
 
 #![no_std]
