@@ -85,6 +85,6 @@ jobs:
       working-directory: "../msvc-wine-rust"
     - uses: actions/checkout@v2
     - run: "make"
-      working-directory: examples/hello_in_panic
+      working-directory: examples/hello
     - run: "cargo clippy --verbose"
-      working-directory: examples/hello_in_panic
+      working-directory: examples/hello
