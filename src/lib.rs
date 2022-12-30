@@ -206,7 +206,10 @@ struct File(u16);
 impl Drop for File {
     fn drop(&mut self) {
         let r = int_21h_ah_3Eh_close(self.0);
-        if r.is_err() && !panicking() { r.unwrap(); }
+        if r.is_err() && !panicking() {
+            #[allow(clippy::panicking_unwrap)]
+            r.unwrap();
+        }
     }
 }
 
