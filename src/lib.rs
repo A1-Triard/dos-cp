@@ -39,11 +39,11 @@ pub const fn hash(w: u16, p: u16) -> u8 {
     ((w ^ (w >> 8)) & 0x007F) as u8
 }
 
-const CODE_PAGE_SIZE: usize = 512;
+const CODE_PAGE_SIZE: u16 = 512;
 
 #[derive(Debug, Clone)]
 #[repr(C, align(8))]
-pub struct CodePage(pub [u8; CODE_PAGE_SIZE]);
+pub struct CodePage(pub [u8; CODE_PAGE_SIZE as _]);
 
 impl CodePage {
     #[cfg(feature="nightly")]
@@ -147,12 +147,12 @@ impl CodePage {
         if dos_ver.al_major < 3 || dos_ver.al_major == 3 && dos_ver.ah_minor < 30 {
             return Err(CodePageLoadError::Dos33Required);
         }
-        let code_page_memory = int_31h_ax_0100h_rm_alloc(8)
+        let code_page_memory = int_31h_ax_0100h_rm_alloc(CODE_PAGE_SIZE.checked_add(15).unwrap() / 16)
             .map_err(|e| CodePageLoadError::CanNotAlloc(Errno(e.ax_err.into())))?;
         let code_page_selector = RmAlloc { selector: code_page_memory.dx_selector };
         let code_page_memory = unsafe { slice::from_raw_parts_mut(
             ((code_page_memory.ax_segment as u32) << 4) as *mut u8,
-            512
+            CODE_PAGE_SIZE.into()
         ) };
         let code_page_n = int_21h_ax_6601h_code_page()
             .map_err(|e| CodePageLoadError::CanNotGetSelectedCodePage(Errno(e.ax_err.into())))?

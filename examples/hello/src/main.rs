@@ -1,6 +1,6 @@
 #![feature(extern_types)]
 
-//#![deny(warnings)]
+#![deny(warnings)]
 
 #![windows_subsystem="console"]
 #![no_std]
@@ -27,14 +27,11 @@ extern {
     type PEB;
 }
 
-use dos_cp::print;
-use dos_cp::CodePage;
+use dos_cp::println;
 
 #[allow(non_snake_case)]
 #[no_mangle]
 extern "stdcall" fn mainCRTStartup(_: *const PEB) -> u64 {
-    let _ = CodePage::load();
-    //print!("Hello, DOS!").unwrap();
-    //panic!("str");
+    println!("Hello, DOS!").unwrap();
     0
 }
