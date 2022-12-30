@@ -10,6 +10,8 @@
 #![no_std]
 
 #[cfg(feature="load")]
+use core::fmt::{self, Display, Formatter};
+#[cfg(feature="load")]
 use core::mem::{MaybeUninit, forget, transmute};
 use core::num::NonZeroU32;
 #[cfg(feature="load")]
@@ -146,7 +148,7 @@ impl CodePage {
         let code_page_n = int_21h_ax_6601h_code_page()
             .map_err(|e| CodePageLoadError::CanNotGetSelectedCodePage(Errno(e.ax_err.into())))?
             .bx_active;
-        if code_page_n > 999 {
+        if code_page_n > 999 || code_page_n < 100 {
             return Err(CodePageLoadError::UnsupportedCodePage(code_page_n));
         }
         let mut code_page: [MaybeUninit<u8>; 13] = unsafe { MaybeUninit::uninit().assume_init() };
@@ -228,6 +230,48 @@ pub enum CodePageLoadError {
     CanNotOpenCodePageFile(u16, Errno),
     CanNotReadCodePageFile(u16, Errno),
     InvalidCodePageFile(u16),
+}
+
+#[cfg(feature="load")]
+impl CodePageLoadError {
+    pub fn errno(&self) -> Option<Errno> {
+        match self {
+            CodePageLoadError::Dos33Required => None,
+            &CodePageLoadError::CanNotAlloc(e) => Some(e),
+            &CodePageLoadError::CanNotGetSelectedCodePage(e) => Some(e),
+            CodePageLoadError::UnsupportedCodePage(_) => None,
+            &CodePageLoadError::CanNotOpenCodePageFile(_, e) => Some(e),
+            &CodePageLoadError::CanNotReadCodePageFile(_, e) => Some(e),
+            CodePageLoadError::InvalidCodePageFile(_) => None,
+        }
+    }
+
+    pub fn code_page(&self) -> Option<u16> {
+        match self {
+            CodePageLoadError::Dos33Required => None,
+            CodePageLoadError::CanNotAlloc(_) => None,
+            CodePageLoadError::CanNotGetSelectedCodePage(_) => None,
+            &CodePageLoadError::UnsupportedCodePage(n) => Some(n),
+            &CodePageLoadError::CanNotOpenCodePageFile(n, _) => Some(n),
+            &CodePageLoadError::CanNotReadCodePageFile(n, _) => Some(n),
+            &CodePageLoadError::InvalidCodePageFile(n) => Some(n),
+        }
+    }
+}
+
+#[cfg(feature="load")]
+impl Display for CodePageLoadError {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            CodePageLoadError::Dos33Required => write!(f, "DOS >= 3.3 reequired"),
+            CodePageLoadError::CanNotAlloc(e) => write!(f, "cannot allocate real-mode memory for code page ({e})"),
+            CodePageLoadError::CanNotGetSelectedCodePage(e) => write!(f, "cannon get selected code page ({e})"),
+            CodePageLoadError::UnsupportedCodePage(n) => write!(f, "unsupported code page {n}"),
+            CodePageLoadError::CanNotOpenCodePageFile(n, e) => write!(f, "cannot open code page file 'CODEPAGE\\{n}' ({e})"),
+            CodePageLoadError::CanNotReadCodePageFile(n, e) => write!(f, "cannot read code page file 'CODEPAGE\\{n}' ({e})"),
+            CodePageLoadError::InvalidCodePageFile(n) => write!(f, "invalid code page file 'CODEPAGE\\{n}'"),
+        }
+    }
 }
 
 #[cfg(feature="load")]
