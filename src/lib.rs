@@ -148,7 +148,7 @@ impl CodePage {
         let code_page_n = int_21h_ax_6601h_code_page()
             .map_err(|e| CodePageLoadError::CanNotGetSelectedCodePage(Errno(e.ax_err.into())))?
             .bx_active;
-        if code_page_n > 999 || code_page_n < 100 {
+        if !(100 ..= 999).contains(&code_page_n) {
             return Err(CodePageLoadError::UnsupportedCodePage(code_page_n));
         }
         let mut code_page: [MaybeUninit<u8>; 13] = unsafe { MaybeUninit::uninit().assume_init() };
