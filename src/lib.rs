@@ -302,7 +302,7 @@ impl fmt::Write for DosStdout {
         let cp = CodePage::load().map_err(|_| fmt::Error)?;
         let c = cp.from_char(c).unwrap_or(b'?');
         match int_21h_ah_40h_write(1, &[c]) {
-            Err(_) | Ok(AxWritten { ax_written: 0 }) => return Err(fmt::Error),
+            Err(_) | Ok(AxWritten { ax_written: 0 }) => Err(fmt::Error),
             _ => Ok(()),
         }
     }
