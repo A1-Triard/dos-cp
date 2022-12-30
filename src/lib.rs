@@ -297,6 +297,13 @@ impl Drop for RmAlloc {
 pub struct DosStdout;
 
 #[cfg(feature="load")]
+impl DosStdout {
+    pub fn write_fmt(&mut self, args: fmt::Arguments) -> fmt::Result {
+        <Self as fmt::Write>::write_fmt(self, args)
+    }
+}
+
+#[cfg(feature="load")]
 impl fmt::Write for DosStdout {
     fn write_char(&mut self, c: char) -> fmt::Result {
         let cp = CodePage::load().map_err(|_| fmt::Error)?;
