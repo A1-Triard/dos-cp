@@ -1,7 +1,22 @@
 #![deny(warnings)]
 
 use dos_cp::{CodePage, hash};
+use std::env::var_os;
+use std::fs::{File, create_dir_all};
+use std::io::Write;
 use std::mem::{MaybeUninit, transmute};
+use std::path::Path;
+
+pub fn build() {
+    let out_dir = var_os("OUT_DIR").unwrap();
+    let out_dir = Path::new(&out_dir).join("CODEPAGE");
+    create_dir_all(&out_dir).unwrap();
+    for &code_page in KNOWN_CODE_PAGES {
+        let file = out_dir.join(format!("{}", code_page));
+        let mut file = File::create(file).unwrap();
+        file.write_all(&CodePage::generate(code_page).0).unwrap();
+    }
+}
 
 pub const KNOWN_CODE_PAGES: &[u16] = &[
     437, 720, 737, 850, 852, 855, 857, 858, 860,
