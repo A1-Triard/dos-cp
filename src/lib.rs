@@ -15,6 +15,8 @@ use core::num::NonZeroU32;
 #[cfg(feature="load")]
 use core::slice::{self};
 #[cfg(feature="load")]
+use core::sync::atomic::{AtomicBool, Ordering};
+#[cfg(feature="load")]
 use errno_no_std::Errno;
 #[cfg(feature="load")]
 use pc_ints::*;
@@ -125,6 +127,11 @@ impl CodePage {
 
     #[cfg(feature="load")]
     pub fn load() -> Result<&'static CodePage, CodePageLoadError> {
+        let mut loaded = LoadedCodePageGuard::acquire();
+        let loaded_code_page = loaded.code_page();
+        if let Some(code_page) = loaded_code_page {
+            return Ok(code_page);
+        }
         let dos_ver = int_21h_ah_30h_dos_ver();
         if dos_ver.al_major < 3 || dos_ver.al_major == 3 && dos_ver.ah_minor < 30 {
             return Err(CodePageLoadError::Dos33Required);
@@ -175,7 +182,40 @@ impl CodePage {
         }
         let code_page = unsafe { &*(code_page_memory.as_ptr() as *const CodePage) };
         forget(code_page_selector);
+        loaded_code_page.replace(code_page);
         Ok(code_page)
+    }
+}
+
+#[cfg(feature="load")]
+struct LoadedCodePageGuard;
+
+#[cfg(feature="load")]
+static LOADED_CODE_PAGE_GUARD: AtomicBool = AtomicBool::new(false);
+
+#[cfg(feature="load")]
+static mut LOADED_CODE_PAGE: Option<&'static CodePage> = None;
+
+#[cfg(feature="load")]
+impl LoadedCodePageGuard {
+    fn acquire() -> Self {
+        loop {
+            if LOADED_CODE_PAGE_GUARD.compare_exchange_weak(false, true, Ordering::SeqCst, Ordering::Relaxed).is_ok() {
+                break;
+            }
+        }
+        LoadedCodePageGuard
+    }
+
+    fn code_page(&mut self) -> &mut Option<&'static CodePage> {
+        unsafe { &mut LOADED_CODE_PAGE }
+    }
+}
+
+#[cfg(feature="load")]
+impl Drop for LoadedCodePageGuard {
+    fn drop(&mut self) {
+        LOADED_CODE_PAGE_GUARD.store(false, Ordering::SeqCst);
     }
 }
 
