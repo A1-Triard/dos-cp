@@ -21,11 +21,12 @@ exclude = [
 
 [features]
 default = ["nightly", "load"]
-nightly = []
-load = ["dep:pc-ints", "dep:errno-no-std"]
+nightly = ["iter-identify_first_last/nightly"]
+load = ["dep:pc-ints", "dep:errno-no-std", "iter-identify_first_last"]
 
 [dependencies]
 errno-no-std = { version = "0.1.5", default-features = false, optional = true }
+iter-identify_first_last = { version = "0.1.0", default-features = false, optional = true }
 pc-ints = { version = "0.2.0", optional = true }
 
 [badges]

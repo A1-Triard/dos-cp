@@ -21,7 +21,14 @@ use core::sync::atomic::{AtomicBool, Ordering};
 #[cfg(feature="load")]
 use errno_no_std::Errno;
 #[cfg(feature="load")]
+use iter_identify_first_last::IteratorIdentifyFirstLastExt;
+#[cfg(feature="load")]
 use pc_ints::*;
+
+#[doc(hidden)]
+pub use core::write as std_write;
+#[doc(hidden)]
+pub use core::writeln as std_writeln;
 
 #[doc(hidden)]
 #[inline]
@@ -284,4 +291,62 @@ impl Drop for RmAlloc {
     fn drop(&mut self) {
        let _ = int_31h_ax_0101h_rm_free(self.selector);
     }
+}
+
+#[cfg(feature="load")]
+pub struct DosStdout;
+
+#[cfg(feature="load")]
+impl fmt::Write for DosStdout {
+    fn write_char(&mut self, c: char) -> fmt::Result {
+        let cp = CodePage::load().map_err(|_| fmt::Error)?;
+        let c = cp.from_char(c).unwrap_or(b'?');
+        match int_21h_ah_40h_write(1, &[c]) {
+            Err(_) | Ok(AxWritten { ax_written: 0 }) => return Err(fmt::Error),
+            _ => Ok(()),
+        }
+    }
+
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        let cp = CodePage::load().map_err(|_| fmt::Error)?;
+        let mut buf = [0; 128];
+        let mut i = 0;
+        for (is_last, c) in s.chars().identify_last() {
+            buf[i] = cp.from_char(c).unwrap_or(b'?');
+            i += 1;
+            if is_last || i == buf.len() {
+                match int_21h_ah_40h_write(1, &buf[.. i]) {
+                    Err(_) => return Err(fmt::Error),
+                    Ok(AxWritten { ax_written }) if usize::from(ax_written) < i => return Err(fmt::Error),
+                    _ => { },
+                }
+                i = 0;
+            }
+        }
+        Ok(())
+    }
+}
+
+#[cfg(feature="load")]
+#[macro_export]
+macro_rules! print {
+    (
+        $($arg:tt)*
+    ) => {
+        $crate::std_write!($crate::DosStdout, $($arg)*)
+    };
+}
+
+#[cfg(feature="load")]
+#[macro_export]
+macro_rules! println {
+    (
+    ) => {
+        $crate::std_writeln!($crate::DosStdout)
+    };
+    (
+        $($arg:tt)*
+    ) => {
+        $crate::std_writeln!($crate::DosStdout, $($arg)*)
+    };
 }
