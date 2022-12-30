@@ -23,6 +23,8 @@ use errno_no_std::Errno;
 #[cfg(feature="load")]
 use iter_identify_first_last::IteratorIdentifyFirstLastExt;
 #[cfg(feature="load")]
+use panicking::panicking;
+#[cfg(feature="load")]
 use pc_ints::*;
 
 #[doc(hidden)]
@@ -168,11 +170,12 @@ impl CodePage {
         let code_page = int_21h_ah_3Dh_open(code_page.as_ptr(), 0x00)
             .map_err(|e| CodePageLoadError::CanNotOpenCodePageFile(code_page_n, Errno(e.ax_err.into())))?
             .ax_handle;
+        let code_page = File(code_page);
         let mut code_page_buf: &mut [MaybeUninit<u8>] = unsafe { transmute(&mut code_page_memory[..]) };
         loop {
             if code_page_buf.is_empty() {
                 let mut byte: MaybeUninit<u8> = MaybeUninit::uninit();
-                let read = int_21h_ah_3Fh_read(code_page, slice::from_mut(&mut byte))
+                let read = int_21h_ah_3Fh_read(code_page.0, slice::from_mut(&mut byte))
                     .map_err(|e| CodePageLoadError::CanNotReadCodePageFile(code_page_n, Errno(e.ax_err.into())))?
                     .ax_read;
                 if read != 0 {
@@ -180,7 +183,7 @@ impl CodePage {
                 }
                 break;
             }
-            let read = int_21h_ah_3Fh_read(code_page, code_page_buf)
+            let read = int_21h_ah_3Fh_read(code_page.0, code_page_buf)
                 .map_err(|e| CodePageLoadError::CanNotReadCodePageFile(code_page_n, Errno(e.ax_err.into())))?
                 .ax_read;
             if read == 0 { break; }
@@ -193,6 +196,17 @@ impl CodePage {
         forget(code_page_selector);
         loaded_code_page.replace(code_page);
         Ok(code_page)
+    }
+}
+
+#[cfg(feature="load")]
+struct File(u16);
+
+#[cfg(feature="load")]
+impl Drop for File {
+    fn drop(&mut self) {
+        let r = int_21h_ah_3Eh_close(self.0);
+        if r.is_err() && !panicking() { r.unwrap(); }
     }
 }
 
