@@ -32,6 +32,6 @@ use dos_cp::println;
 #[allow(non_snake_case)]
 #[no_mangle]
 extern "stdcall" fn mainCRTStartup(_: *const PEB) -> u64 {
-    println!("Hello, DOS!").unwrap();
+    println!("Hello, DOS!");
     0
 }

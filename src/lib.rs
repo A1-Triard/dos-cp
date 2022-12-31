@@ -357,7 +357,7 @@ macro_rules! print {
     (
         $($arg:tt)*
     ) => {
-        $crate::std_write!($crate::DosStdout, $($arg)*)
+        $crate::std_write!($crate::DosStdout, $($arg)*).unwrap_or(())
     };
 }
 
@@ -366,11 +366,11 @@ macro_rules! print {
 macro_rules! println {
     (
     ) => {
-        $crate::std_writeln!($crate::DosStdout)
+        $crate::std_writeln!($crate::DosStdout).unwrap_or(())
     };
     (
         $($arg:tt)*
     ) => {
-        $crate::std_writeln!($crate::DosStdout, $($arg)*)
+        $crate::std_writeln!($crate::DosStdout, $($arg)*).unwrap_or(())
     };
 }
