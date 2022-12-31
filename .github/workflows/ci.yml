@@ -90,3 +90,5 @@ jobs:
       working-directory: examples/hello
     - run: "make clippy"
       working-directory: examples/hello
+    - run: "cargo outdated --verbose --aggresssive --root-deps-only --exit-code 1"
+      working-directory: examples/hello
