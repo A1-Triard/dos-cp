@@ -1,4 +1,5 @@
 #![deny(warnings)]
+
 use dos_cp::CodePage;
 use dos_cp_generator::{CodePageGenExt};
 
