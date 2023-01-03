@@ -84,7 +84,7 @@ jobs:
     - run: "echo -n \"linker=\\\"$PWD/linker-scripts/linkx86.sh\\\"\" >> $HOME/.cargo/config"
       working-directory: "../msvc-wine-rust"
     - uses: actions/checkout@v2
-    - run: "make"
+    - run: "make debug"
       working-directory: examples/hello
     - run: "make release"
       working-directory: examples/hello
