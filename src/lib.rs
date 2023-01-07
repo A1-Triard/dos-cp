@@ -5,7 +5,7 @@
 
 #![cfg_attr(feature="nightly", feature(const_char_from_u32_unchecked))]
 
-//#![deny(warnings)]
+#![deny(warnings)]
 
 #![no_std]
 
@@ -339,14 +339,12 @@ impl fmt::Write for DosStdout {
 
     fn write_str(&mut self, s: &str) -> fmt::Result {
         let cp = CodePage::load().map_err(|_| fmt::Error)?;
-        panic!("{:?}", cp);
         let mut buf = [0; 128];
         let mut i = 0;
         for (is_last, c) in s.chars().identify_last() {
             buf[i] = cp.from_char(c).unwrap_or(b'?');
             i += 1;
             if is_last || i == buf.len() {
-                panic!("{:?}", buf);
                 match int_21h_ah_40h_write(1, &buf[.. i]) {
                     Err(_) => return Err(fmt::Error),
                     Ok(AxWritten { ax_written }) if usize::from(ax_written) < i => return Err(fmt::Error),
