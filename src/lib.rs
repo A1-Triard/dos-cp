@@ -19,7 +19,11 @@ use core::slice::{self};
 #[cfg(feature="load")]
 use core::sync::atomic::{AtomicBool, Ordering};
 #[cfg(feature="load")]
+use either::{Either, Left, Right};
+#[cfg(feature="load")]
 use errno_no_std::Errno;
+#[cfg(feature="load")]
+use exit_no_std::exit;
 #[cfg(feature="load")]
 use iter_identify_first_last::IteratorIdentifyFirstLastExt;
 #[cfg(feature="load")]
@@ -137,6 +141,17 @@ impl CodePage {
     }
 
     #[cfg(feature="load")]
+    pub fn load_or_exit_with_msg(exit_code: u8) -> &'static CodePage {
+        match Self::load() {
+            Ok(cp) => cp,
+            Err(e) => {
+                write!(DosLastChanceWriter, "Error: {e}.").unwrap();
+                exit(exit_code);
+            },
+        }
+    }
+
+    #[cfg(feature="load")]
     pub fn load() -> Result<&'static CodePage, CodePageLoadError> {
         let mut loaded = LoadedCodePageGuard::acquire();
         let loaded_code_page = loaded.code_page();
@@ -197,12 +212,62 @@ impl CodePage {
         loaded_code_page.replace(code_page);
         Ok(code_page)
     }
+
+    #[cfg(feature="load")]
+    pub fn inkey(&self) -> Result<Option<Either<u8, char>>, ()> {
+        let c = int_21h_ah_06h_dl_FFh_inkey().map_err(|_| ())?;
+        let c = match c {
+            Some(x) => x.al_char,
+            None => return Ok(None),
+        };
+        if c == 0 {
+            let c = int_21h_ah_06h_dl_FFh_inkey().map_err(|_| ())?;
+            let c = c.ok_or(())?.al_char;
+            Ok(Some(Left(c)))
+        } else {
+            Ok(self.to_char(c).map(Right))
+        }
+    }
 }
 
-pub fn inkey() -> Result<Option<u8>, ()> {
-    let c = int_21h_ah_06h_dl_FFh_inkey().map_err(|_| ())?;
-    Ok(c.map(|x| x.al_char))
-    //let cp = CodePage::load().map_err(|_| fmt::Error)?;
+#[cfg(feature="load")]
+pub fn inkey() -> Result<Option<Either<u8, char>>, ()> {
+    let cp = CodePage::load().map_err(|_| ())?;
+    cp.inkey()
+}
+
+#[cfg(feature="load")]
+struct DosLastChanceWriter;
+
+#[cfg(feature="load")]
+impl DosLastChanceWriter {
+    pub fn write_fmt(&mut self, args: fmt::Arguments) -> fmt::Result {
+        <Self as fmt::Write>::write_fmt(self, args)
+    }
+}
+
+#[cfg(feature="load")]
+impl fmt::Write for DosLastChanceWriter {
+    fn write_char(&mut self, c: char) -> fmt::Result {
+        let c = c as u32;
+        let c = if c > 0x7F || c == '\r' as u32 {
+            b'?'
+        } else {
+            c as u8
+        };
+        if c == b'\n' {
+            int_21h_ah_02h_out_ch(b'\r');
+        }
+        int_21h_ah_02h_out_ch(c);
+        Ok(())
+    }
+
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        for c in s.chars() {
+            self.write_char(c)?;
+        }
+        Ok(())
+    }
 }
 
 #[cfg(feature="load")]
