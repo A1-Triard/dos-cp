@@ -237,6 +237,7 @@ pub fn inkey() -> Result<Option<Either<u8, char>>, InkeyErr> {
 }
 
 #[cfg(feature="load")]
+#[derive(Debug)]
 pub struct InkeyErr;
 
 #[cfg(feature="load")]
