@@ -1,6 +1,6 @@
 #![feature(extern_types)]
 
-//#![deny(warnings)]
+#![deny(warnings)]
 
 #![windows_subsystem="console"]
 #![no_std]
@@ -27,13 +27,12 @@ extern {
     type PEB;
 }
 
-use dos_cp::{inkey, println};
+use dos_cp::{println};
 
 #[allow(non_snake_case)]
 #[no_mangle]
 extern "stdcall" fn mainCRTStartup(_: *const PEB) -> u64 {
     println!("Hello, DOS!");
-    panic!("XXXX");
     /*
     loop {
         if let Some(c) = inkey().expect("DPMI error") {

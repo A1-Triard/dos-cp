@@ -10,7 +10,7 @@
 #![no_std]
 
 #[cfg(feature="load")]
-use core::fmt::{self, Display, Formatter};
+use core::fmt::{self, Debug, Display, Formatter};
 #[cfg(feature="load")]
 use core::mem::{MaybeUninit, forget, transmute};
 use core::num::NonZeroU32;
@@ -305,6 +305,13 @@ impl Display for CodePageLoadError {
 }
 
 #[cfg(feature="load")]
+impl Debug for CodePageLoadError {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        <Self as Display>::fmt(self, f)
+    }
+}
+
+#[cfg(feature="load")]
 struct RmAlloc {
     selector: u16,
 }
@@ -317,7 +324,7 @@ impl Drop for RmAlloc {
 }
 
 #[cfg(feature="load")]
-pub struct DosStdout;
+pub struct DosStdout { pub panic: bool }
 
 #[cfg(feature="load")]
 impl DosStdout {
@@ -329,7 +336,8 @@ impl DosStdout {
 #[cfg(feature="load")]
 impl fmt::Write for DosStdout {
     fn write_char(&mut self, c: char) -> fmt::Result {
-        let cp = CodePage::load().map_err(|_| fmt::Error)?;
+        let cp = CodePage::load();
+        let cp = if self.panic { cp.unwrap() } else { cp.map_err(|_| fmt::Error)? };
         let c = cp.from_char(c).unwrap_or(b'?');
         match int_21h_ah_40h_write(1, &[c]) {
             Err(_) | Ok(AxWritten { ax_written: 0 }) => Err(fmt::Error),
@@ -338,7 +346,8 @@ impl fmt::Write for DosStdout {
     }
 
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        let cp = CodePage::load().map_err(|_| fmt::Error)?;
+        let cp = CodePage::load();
+        let cp = if self.panic { cp.unwrap() } else { cp.map_err(|_| fmt::Error)? };
         let mut buf = [0; 128];
         let mut i = 0;
         for (is_last, c) in s.chars().identify_last() {
@@ -363,7 +372,7 @@ macro_rules! print {
     (
         $($arg:tt)*
     ) => {
-        $crate::std_write!($crate::DosStdout, $($arg)*).unwrap()
+        $crate::std_write!($crate::DosStdout { panic: true }, $($arg)*).unwrap()
     };
 }
 
@@ -372,11 +381,11 @@ macro_rules! print {
 macro_rules! println {
     (
     ) => {
-        $crate::std_writeln!($crate::DosStdout).unwrap()
+        $crate::std_writeln!($crate::DosStdout { panic: true }).unwrap()
     };
     (
         $($arg:tt)*
     ) => {
-        $crate::std_writeln!($crate::DosStdout, $($arg)*).unwrap()
+        $crate::std_writeln!($crate::DosStdout { panic: true }, $($arg)*).unwrap()
     };
 }
