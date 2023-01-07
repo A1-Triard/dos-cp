@@ -5,7 +5,7 @@
 
 #![cfg_attr(feature="nightly", feature(const_char_from_u32_unchecked))]
 
-#![deny(warnings)]
+//#![deny(warnings)]
 
 #![no_std]
 
@@ -199,6 +199,12 @@ impl CodePage {
     }
 }
 
+pub fn inkey() -> Result<Option<u8>, ()> {
+    let c = int_21h_ah_06h_dl_FFh_inkey().map_err(|_| ())?;
+    Ok(c.map(|x| x.al_char))
+    //let cp = CodePage::load().map_err(|_| fmt::Error)?;
+}
+
 #[cfg(feature="load")]
 struct File(u16);
 
@@ -333,12 +339,14 @@ impl fmt::Write for DosStdout {
 
     fn write_str(&mut self, s: &str) -> fmt::Result {
         let cp = CodePage::load().map_err(|_| fmt::Error)?;
+        panic!("{:?}", cp);
         let mut buf = [0; 128];
         let mut i = 0;
         for (is_last, c) in s.chars().identify_last() {
             buf[i] = cp.from_char(c).unwrap_or(b'?');
             i += 1;
             if is_last || i == buf.len() {
+                panic!("{:?}", buf);
                 match int_21h_ah_40h_write(1, &buf[.. i]) {
                     Err(_) => return Err(fmt::Error),
                     Ok(AxWritten { ax_written }) if usize::from(ax_written) < i => return Err(fmt::Error),
@@ -357,7 +365,7 @@ macro_rules! print {
     (
         $($arg:tt)*
     ) => {
-        $crate::std_write!($crate::DosStdout, $($arg)*).unwrap_or(())
+        $crate::std_write!($crate::DosStdout, $($arg)*).unwrap()
     };
 }
 
@@ -366,11 +374,11 @@ macro_rules! print {
 macro_rules! println {
     (
     ) => {
-        $crate::std_writeln!($crate::DosStdout).unwrap_or(())
+        $crate::std_writeln!($crate::DosStdout).unwrap()
     };
     (
         $($arg:tt)*
     ) => {
-        $crate::std_writeln!($crate::DosStdout, $($arg)*).unwrap_or(())
+        $crate::std_writeln!($crate::DosStdout, $($arg)*).unwrap()
     };
 }
