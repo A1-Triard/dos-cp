@@ -27,20 +27,12 @@ extern {
     type PEB;
 }
 
-use dos_cp::{inkey, println};
+use dos_cp::{CodePage, println};
 
 #[allow(non_snake_case)]
 #[no_mangle]
 extern "stdcall" fn mainCRTStartup(_: *const PEB) -> u64 {
-    if let Err(e) = CodePage::load() {
-        panic!("{}", e);
-    }
+    CodePage::load_or_exit_with_msg(1);
     println!("Hello, DOS!");
-    loop {
-        if let Some(c) = inkey().expect("DPMI error") {
-            println!("{c}");
-            break;
-        }
-    }
     0
 }
