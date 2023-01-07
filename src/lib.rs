@@ -214,15 +214,15 @@ impl CodePage {
     }
 
     #[cfg(feature="load")]
-    pub fn inkey(&self) -> Result<Option<Either<u8, char>>, ()> {
-        let c = int_21h_ah_06h_dl_FFh_inkey().map_err(|_| ())?;
+    pub fn inkey(&self) -> Result<Option<Either<u8, char>>, InkeyErr> {
+        let c = int_21h_ah_06h_dl_FFh_inkey().map_err(|_| InkeyErr)?;
         let c = match c {
             Some(x) => x.al_char,
             None => return Ok(None),
         };
         if c == 0 {
-            let c = int_21h_ah_06h_dl_FFh_inkey().map_err(|_| ())?;
-            let c = c.ok_or(())?.al_char;
+            let c = int_21h_ah_06h_dl_FFh_inkey().map_err(|_| InkeyErr)?;
+            let c = c.ok_or(InkeyErr)?.al_char;
             Ok(Some(Left(c)))
         } else {
             Ok(self.to_char(c).map(Right))
@@ -231,10 +231,13 @@ impl CodePage {
 }
 
 #[cfg(feature="load")]
-pub fn inkey() -> Result<Option<Either<u8, char>>, ()> {
-    let cp = CodePage::load().map_err(|_| ())?;
+pub fn inkey() -> Result<Option<Either<u8, char>>, InkeyErr> {
+    let cp = CodePage::load().map_err(|_| InkeyErr)?;
     cp.inkey()
 }
+
+#[cfg(feature="load")]
+pub struct InkeyErr;
 
 #[cfg(feature="load")]
 struct DosLastChanceWriter;
