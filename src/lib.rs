@@ -21,8 +21,6 @@ use core::sync::atomic::{AtomicBool, Ordering};
 #[cfg(feature="load")]
 use either::{Either, Left, Right};
 #[cfg(feature="load")]
-use errno_no_std::Errno;
-#[cfg(feature="load")]
 use exit_no_std::exit;
 #[cfg(feature="load")]
 use iter_identify_first_last::IteratorIdentifyFirstLastExt;
@@ -163,17 +161,17 @@ impl CodePage {
             return Err(CodePageLoadError::Dos33Required);
         }
         let code_page_memory = int_31h_ax_0100h_rm_alloc(CODE_PAGE_SIZE.checked_add(15).unwrap() / 16)
-            .map_err(|e| CodePageLoadError::CanNotAlloc(Errno(e.ax_err.into())))?;
+            .map_err(|e| CodePageLoadError::CanNotAlloc { err_code: e.ax_err })?;
         let code_page_selector = RmAlloc { selector: code_page_memory.dx_selector };
         let code_page_memory = unsafe { slice::from_raw_parts_mut(
             ((code_page_memory.ax_segment as u32) << 4) as *mut u8,
             CODE_PAGE_SIZE.into()
         ) };
         let code_page_n = int_21h_ax_6601h_code_page()
-            .map_err(|e| CodePageLoadError::CanNotGetSelectedCodePage(Errno(e.ax_err.into())))?
+            .map_err(|e| CodePageLoadError::CanNotGetSelectedCodePage { err_code: e.ax_err })?
             .bx_active;
         if !(100 ..= 999).contains(&code_page_n) {
-            return Err(CodePageLoadError::UnsupportedCodePage(code_page_n));
+            return Err(CodePageLoadError::UnsupportedCodePage { code_page: code_page_n });
         }
         let mut code_page: [MaybeUninit<u8>; 13] = unsafe { MaybeUninit::uninit().assume_init() };
         code_page[.. 9].copy_from_slice(unsafe { transmute(&b"CODEPAGE\\"[..]) });
@@ -183,7 +181,7 @@ impl CodePage {
         code_page[12].write(0);
         let code_page: [u8; 13] = unsafe { transmute(code_page) };
         let code_page = int_21h_ah_3Dh_open(code_page.as_ptr(), 0x00)
-            .map_err(|e| CodePageLoadError::CanNotOpenCodePageFile(code_page_n, Errno(e.ax_err.into())))?
+            .map_err(|e| CodePageLoadError::CanNotOpenCodePageFile { code_page: code_page_n, err_code: e.ax_err })?
             .ax_handle;
         let code_page = File(code_page);
         let mut code_page_buf: &mut [MaybeUninit<u8>] = unsafe { transmute(&mut code_page_memory[..]) };
@@ -191,21 +189,21 @@ impl CodePage {
             if code_page_buf.is_empty() {
                 let mut byte: MaybeUninit<u8> = MaybeUninit::uninit();
                 let read = int_21h_ah_3Fh_read(code_page.0, slice::from_mut(&mut byte))
-                    .map_err(|e| CodePageLoadError::CanNotReadCodePageFile(code_page_n, Errno(e.ax_err.into())))?
+                    .map_err(|e| CodePageLoadError::CanNotReadCodePageFile { code_page: code_page_n, err_code: e.ax_err })?
                     .ax_read;
                 if read != 0 {
-                    return Err(CodePageLoadError::InvalidCodePageFile(code_page_n));
+                    return Err(CodePageLoadError::InvalidCodePageFile { code_page: code_page_n });
                 }
                 break;
             }
             let read = int_21h_ah_3Fh_read(code_page.0, code_page_buf)
-                .map_err(|e| CodePageLoadError::CanNotReadCodePageFile(code_page_n, Errno(e.ax_err.into())))?
+                .map_err(|e| CodePageLoadError::CanNotReadCodePageFile { code_page: code_page_n, err_code: e.ax_err })?
                 .ax_read;
             if read == 0 { break; }
             code_page_buf = &mut code_page_buf[read as usize ..];
         }
         if !code_page_buf.is_empty() {
-            return Err(CodePageLoadError::InvalidCodePageFile(code_page_n));
+            return Err(CodePageLoadError::InvalidCodePageFile { code_page: code_page_n });
         }
         let code_page = unsafe { &*(code_page_memory.as_ptr() as *const CodePage) };
         forget(code_page_selector);
@@ -323,37 +321,25 @@ impl Drop for LoadedCodePageGuard {
 #[cfg(feature="load")]
 pub enum CodePageLoadError {
     Dos33Required,
-    CanNotAlloc(Errno),
-    CanNotGetSelectedCodePage(Errno),
-    UnsupportedCodePage(u16),
-    CanNotOpenCodePageFile(u16, Errno),
-    CanNotReadCodePageFile(u16, Errno),
-    InvalidCodePageFile(u16),
+    CanNotAlloc { err_code: u16 },
+    CanNotGetSelectedCodePage { err_code: u16 },
+    UnsupportedCodePage { code_page: u16 },
+    CanNotOpenCodePageFile { code_page: u16, err_code: u16 },
+    CanNotReadCodePageFile { code_page: u16, err_code: u16 },
+    InvalidCodePageFile { code_page: u16 },
 }
 
 #[cfg(feature="load")]
 impl CodePageLoadError {
-    pub fn errno(&self) -> Option<Errno> {
-        match self {
-            CodePageLoadError::Dos33Required => None,
-            &CodePageLoadError::CanNotAlloc(e) => Some(e),
-            &CodePageLoadError::CanNotGetSelectedCodePage(e) => Some(e),
-            CodePageLoadError::UnsupportedCodePage(_) => None,
-            &CodePageLoadError::CanNotOpenCodePageFile(_, e) => Some(e),
-            &CodePageLoadError::CanNotReadCodePageFile(_, e) => Some(e),
-            CodePageLoadError::InvalidCodePageFile(_) => None,
-        }
-    }
-
     pub fn code_page(&self) -> Option<u16> {
         match self {
             CodePageLoadError::Dos33Required => None,
-            CodePageLoadError::CanNotAlloc(_) => None,
-            CodePageLoadError::CanNotGetSelectedCodePage(_) => None,
-            &CodePageLoadError::UnsupportedCodePage(n) => Some(n),
-            &CodePageLoadError::CanNotOpenCodePageFile(n, _) => Some(n),
-            &CodePageLoadError::CanNotReadCodePageFile(n, _) => Some(n),
-            &CodePageLoadError::InvalidCodePageFile(n) => Some(n),
+            CodePageLoadError::CanNotAlloc { .. } => None,
+            CodePageLoadError::CanNotGetSelectedCodePage { .. } => None,
+            &CodePageLoadError::UnsupportedCodePage { code_page } => Some(code_page),
+            &CodePageLoadError::CanNotOpenCodePageFile { code_page, .. } => Some(code_page),
+            &CodePageLoadError::CanNotReadCodePageFile { code_page, .. } => Some(code_page),
+            &CodePageLoadError::InvalidCodePageFile { code_page } => Some(code_page),
         }
     }
 }
@@ -363,12 +349,16 @@ impl Display for CodePageLoadError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
             CodePageLoadError::Dos33Required => write!(f, "DOS >= 3.3 reequired"),
-            CodePageLoadError::CanNotAlloc(e) => write!(f, "cannot allocate real-mode memory for code page ({e})"),
-            CodePageLoadError::CanNotGetSelectedCodePage(e) => write!(f, "cannon get selected code page ({e})"),
-            CodePageLoadError::UnsupportedCodePage(n) => write!(f, "unsupported code page {n}"),
-            CodePageLoadError::CanNotOpenCodePageFile(n, e) => write!(f, "cannot open code page file 'CODEPAGE\\{n}' ({e})"),
-            CodePageLoadError::CanNotReadCodePageFile(n, e) => write!(f, "cannot read code page file 'CODEPAGE\\{n}' ({e})"),
-            CodePageLoadError::InvalidCodePageFile(n) => write!(f, "invalid code page file 'CODEPAGE\\{n}'"),
+            CodePageLoadError::CanNotAlloc { err_code } =>
+                write!(f, "cannot allocate real-mode memory for code page ({err_code:04X}h)"),
+            CodePageLoadError::CanNotGetSelectedCodePage { err_code } =>
+                write!(f, "cannon get selected code page ({err_code:04X}h)"),
+            CodePageLoadError::UnsupportedCodePage { code_page } => write!(f, "unsupported code page {code_page}"),
+            CodePageLoadError::CanNotOpenCodePageFile { code_page, err_code } =>
+                write!(f, "cannot open code page file 'CODEPAGE\\{code_page}' ({err_code:04X}h)"),
+            CodePageLoadError::CanNotReadCodePageFile { code_page, err_code } =>
+                write!(f, "cannot read code page file 'CODEPAGE\\{code_page}' ({err_code:04X}h)"),
+            CodePageLoadError::InvalidCodePageFile { code_page } => write!(f, "invalid code page file 'CODEPAGE\\{code_page}'"),
         }
     }
 }
