@@ -28,7 +28,7 @@ load = ["nightly", "dep:pc-ints", "iter-identify_first_last"]
 [dependencies]
 either = { version = "1.8.0", default-features = false }
 exit-no-std = "0.2.0"
-iter-identify_first_last = { version = "0.1.0", default-features = false, optional = true }
+iter-identify_first_last = { version = "0.2.0", default-features = false, optional = true }
 panicking = { version = "0.4.0", default-features = false }
 pc-ints = { version = "0.3.1", optional = true }
 
