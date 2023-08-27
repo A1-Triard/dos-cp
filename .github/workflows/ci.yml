@@ -18,16 +18,16 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macOS-latest]
         features: ["", "--features=nightly", "--features=load"]
-        rust: ["1.61", "stable", "beta", "nightly"]
+        rust: ["1.71", "stable", "beta", "nightly"]
         exclude:
         - features: "--features=nightly"
-          rust: "1.61"
+          rust: "1.71"
         - features: "--features=nightly"
           rust: "stable"
         - features: "--features=nightly"
           rust: "beta"
         - features: "--features=load"
-          rust: "1.61"
+          rust: "1.71"
         - features: "--features=load"
           rust: "stable"
         - features: "--features=load"
