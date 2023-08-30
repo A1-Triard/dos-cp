@@ -398,9 +398,17 @@ impl fmt::Write for DosStdout {
         let cp = CodePage::load();
         let cp = if self.panic { cp.unwrap() } else { cp.map_err(|_| fmt::Error)? };
         let c = cp.from_char(c).unwrap_or(b'?');
-        match int_21h_ah_40h_write(1, &[c]) {
-            Err(_) | Ok(AxWritten { ax_written: 0 }) => Err(fmt::Error),
-            _ => Ok(()),
+        match c {
+            b'\r' => Ok(()),
+            b'\n' => match int_21h_ah_40h_write(1, b"\r\n") {
+                Err(_) => Err(fmt::Error),
+                Ok(AxWritten { ax_written }) if ax_written < 2 => Err(fmt::Error),
+                _ => Ok(()),
+            },
+            c => match int_21h_ah_40h_write(1, &[c]) {
+                Err(_) | Ok(AxWritten { ax_written: 0 }) => Err(fmt::Error),
+                _ => Ok(()),
+            }
         }
     }
 
@@ -408,17 +416,26 @@ impl fmt::Write for DosStdout {
         let cp = CodePage::load();
         let cp = if self.panic { cp.unwrap() } else { cp.map_err(|_| fmt::Error)? };
         let mut buf = [0; 128];
-        let mut i = 0;
-        for (is_last, c) in s.chars().identify_last() {
-            buf[i] = cp.from_char(c).unwrap_or(b'?');
-            i += 1;
-            if is_last || i == buf.len() {
-                match int_21h_ah_40h_write(1, &buf[.. i]) {
+        for (skip_newline, s) in s.split('\n').identify_last() {
+            let mut i = 0;
+            for (is_last, c) in s.chars().identify_last() {
+                buf[i] = cp.from_char(c).unwrap_or(b'?');
+                i += 1;
+                if is_last || i == buf.len() {
+                    match int_21h_ah_40h_write(1, &buf[.. i]) {
+                        Err(_) => return Err(fmt::Error),
+                        Ok(AxWritten { ax_written }) if usize::from(ax_written) < i => return Err(fmt::Error),
+                        _ => { },
+                    }
+                    i = 0;
+                }
+            }
+            if !skip_newline {
+                match int_21h_ah_40h_write(1, b"\r\n") {
                     Err(_) => return Err(fmt::Error),
-                    Ok(AxWritten { ax_written }) if usize::from(ax_written) < i => return Err(fmt::Error),
+                    Ok(AxWritten { ax_written }) if ax_written < 2 => return Err(fmt::Error),
                     _ => { },
                 }
-                i = 0;
             }
         }
         Ok(())

@@ -6,7 +6,6 @@
 #![no_std]
 #![no_main]
 
-extern crate dos_errno_and_panic;
 extern crate pc_atomics;
 extern crate rlibc;
 
@@ -21,6 +20,9 @@ mod no_std {
     extern "C" fn _fltused() -> ! { panic!("13") }
     #[no_mangle]
     extern "C" fn strlen() -> ! { panic!("14") }
+
+    #[panic_handler]
+    fn panic_handler(info: &core::panic::PanicInfo) -> ! { panic_no_std::panic(info, b'P') }
 }
 
 extern {
