@@ -9,7 +9,7 @@
 extern { }
 
 #[panic_handler]
-extern fn panic(_info: &core::panic::PanicInfo) -> ! {
+fn panic(_info: &core::panic::PanicInfo) -> ! {
     exit_no_std::exit(99)
 }
 
