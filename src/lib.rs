@@ -15,6 +15,8 @@ use core::fmt::{self, Debug, Display, Formatter};
 use core::mem::{MaybeUninit, forget, transmute};
 use core::num::NonZeroU32;
 #[cfg(feature="load")]
+use core::ptr::{self};
+#[cfg(feature="load")]
 use core::slice::{self};
 #[cfg(feature="load")]
 use core::sync::atomic::{AtomicBool, Ordering};
@@ -307,7 +309,7 @@ impl LoadedCodePageGuard {
     }
 
     fn code_page(&mut self) -> &mut Option<&'static CodePage> {
-        unsafe { &mut LOADED_CODE_PAGE }
+        unsafe { &mut *ptr::addr_of_mut!(LOADED_CODE_PAGE) }
     }
 }
 
