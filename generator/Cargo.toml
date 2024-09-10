@@ -1,8 +1,8 @@
 [package]
 edition = "2021"
 name = "dos-cp-generator"
-version = "0.6.0"
-rust-version = "1.81"
+version = "0.6.1"
+rust-version = "1.82"
 authors = ["warlock <internalmike@gmail.com>"]
 description = "DOS code pages build tool for `dos-cp`."
 readme = "README.md"
