@@ -1,8 +1,8 @@
 [package]
 edition = "2021"
 name = "dos-cp"
-version = "0.5.2"
-rust-version = "1.71"
+version = "0.6.0"
+rust-version = "1.81"
 authors = ["warlock <internalmike@gmail.com>"]
 description = "DOS code pages."
 readme = "README.md"
@@ -21,11 +21,12 @@ exclude = [
 ]
 
 [features]
-default = ["nightly", "load"]
-nightly = ["iter-identify_first_last/nightly"]
-load = ["nightly", "dep:pc-ints", "iter-identify_first_last"]
+default = ["load"]
+## disable if you don't need DOS-specific code for loading and using codepages like print(ln)! macros.
+load = ["dep:pc-ints", "iter-identify_first_last"]
 
 [dependencies]
+document-features = "0.2.7"
 either = { version = "1.8.0", default-features = false }
 exit-no-std = "0.2.0"
 iter-identify_first_last = { version = "0.2.0", default-features = false, optional = true }
