@@ -16,22 +16,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macOS-latest]
-        features: ["", "--features=nightly", "--features=load"]
-        rust: ["1.71", "stable", "beta", "nightly"]
-        exclude:
-        - features: "--features=nightly"
-          rust: "1.71"
-        - features: "--features=nightly"
-          rust: "stable"
-        - features: "--features=nightly"
-          rust: "beta"
-        - features: "--features=load"
-          rust: "1.71"
-        - features: "--features=load"
-          rust: "stable"
-        - features: "--features=load"
-          rust: "beta"
+        os: [ubuntu-latest, windows-latest]
+        features: ["", "--features=load"]
+        rust: ["1.81", "stable", "beta", "nightly"]
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions-rs/toolchain@v1
@@ -56,8 +43,6 @@ jobs:
           triple: x86_64-unknown-linux-gnu
         - os: windows-latest
           triple: x86_64-pc-windows-msvc
-        - os: macOS-latest
-          triple: x86_64-apple-darwin
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions-rs/toolchain@v1
