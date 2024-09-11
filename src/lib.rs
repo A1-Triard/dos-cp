@@ -125,7 +125,7 @@ impl CodePage {
             return Err(CodePageLoadError::UnsupportedCodePage { code_page: code_page_n });
         }
         let mut code_page: [MaybeUninit<u8>; 13] = unsafe { MaybeUninit::uninit().assume_init() };
-        code_page[.. 9].copy_from_slice(unsafe { transmute(&b"CODEPAGE\\"[..]) });
+        code_page[.. 9].copy_from_slice(unsafe { transmute::<&[u8], &[MaybeUninit<u8>]>(&b"CODEPAGE\\"[..]) });
         code_page[9].write(b'0' + (code_page_n / 100) as u8);
         code_page[10].write(b'0' + ((code_page_n % 100) / 10) as u8);
         code_page[11].write(b'0' + (code_page_n % 10) as u8);
