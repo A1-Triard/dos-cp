@@ -13,16 +13,13 @@ mod no_std {
     fn panic_handler(info: &core::panic::PanicInfo) -> ! { panic_no_std::panic(info, b'P') }
 }
 
-extern {
-    type PEB;
-}
-
 use dos_cp::{CodePage, inkey, println};
 use either::Right;
+use exit_no_std::exit;
 
 #[allow(non_snake_case)]
 #[no_mangle]
-extern "stdcall" fn mainCRTStartup(_: *const PEB) -> u64 {
+extern "C" fn mainCRTStartup() -> ! {
     CodePage::load_or_exit_with_msg(1);
     loop {
         if let Some(c) = inkey().unwrap() {
@@ -30,5 +27,5 @@ extern "stdcall" fn mainCRTStartup(_: *const PEB) -> u64 {
             if c == Right(' ') { break; }
         }
     }
-    0
+    exit(0)
 }
