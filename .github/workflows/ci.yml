@@ -92,6 +92,6 @@ jobs:
     - name: remove Cargo.lock
       uses: JesseTG/rm@v1.0.3
       with:
-        path: Cargo.lock
+        path: examples/hello/Cargo.lock
     - run: "cargo outdated --verbose --root-deps-only --exit-code 1"
       working-directory: examples/hello
