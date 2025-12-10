@@ -46,13 +46,13 @@ HXRT216.zip:
 	touch -t 200801011952 HXRT216.zip
 
 target/$(WIN_TARGET)/debug/$(BIN).exe: Cargo.toml Cargo.lock src/main.rs build.rs
-	cargo +nightly build --verbose -Z build-std=core,panic_abort --target $(WIN_TARGET).json
+	RUSTFLAGS="--cfg dos" cargo +nightly build --verbose -Z build-std=core,panic_abort --target $(WIN_TARGET).json
 
 target/$(WIN_TARGET)/release/$(BIN).exe: Cargo.toml Cargo.lock src/main.rs build.rs
-	cargo +nightly build --verbose -Z build-std=core,panic_abort -Z build-std-features=panic_immediate_abort --target $(WIN_TARGET).json --release
+	RUSTFLAGS="--cfg dos -Zunstable-options -Cpanic=immediate-abort" cargo +nightly build --verbose -Z build-std=core,panic_abort --target $(WIN_TARGET).json --release
 
 clippy:
-	cargo +nightly clippy --verbose -Z build-std=core,panic_abort -Z build-std-features=panic_immediate_abort --target $(WIN_TARGET).json
+	RUSTFLAGS="--cfg dos" cargo +nightly clippy --verbose -Z build-std=core,panic_abort --target $(WIN_TARGET).json
 
 Cargo.lock: Cargo.toml
 	cargo update

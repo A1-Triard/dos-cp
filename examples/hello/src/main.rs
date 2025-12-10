@@ -1,5 +1,3 @@
-#![feature(extern_types)]
-
 #![deny(warnings)]
 
 #![no_std]

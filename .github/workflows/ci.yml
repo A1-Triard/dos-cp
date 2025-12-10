@@ -18,7 +18,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
         features: ["", "--features=load"]
-        rust: ["1.82", "stable", "beta", "nightly"]
+        rust: ["1.91", "stable", "beta", "nightly"]
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions-rs/toolchain@v1
@@ -32,7 +32,6 @@ jobs:
     - run: "cargo test --verbose --doc --no-default-features ${{ matrix.features }}"
     - run: "cargo doc --verbose --no-default-features ${{ matrix.features }}"
     - run: "cargo build --verbose --release --no-default-features ${{ matrix.features }}"
-    - run: "cargo outdated --verbose --root-deps-only --exit-code 1 ${{ matrix.features }}"
     - run: "cargo clippy --verbose --no-default-features ${{ matrix.features }}"
   ensure_no_std:
     strategy:
@@ -88,10 +87,4 @@ jobs:
     - run: "make release"
       working-directory: examples/hello
     - run: "make clippy"
-      working-directory: examples/hello
-    - name: remove Cargo.lock
-      uses: JesseTG/rm@v1.0.3
-      with:
-        path: examples/hello/Cargo.lock
-    - run: "cargo outdated --verbose --root-deps-only --exit-code 1"
       working-directory: examples/hello
